@@ -27,16 +27,16 @@ gh auth login
 uv run backup tui
 ```
 
-建议先在 TUI 里按 `f` 做 discover，再批量 add 并执行 backup。
+建议先在 TUI 里按 `f` 列举可备份 repo，然后执行备份。
 
 ## Google Drive 首次使用
 
 按官方 quickstart 先完成 OAuth 客户端配置并下载密钥 JSON：  
 https://developers.google.com/workspace/drive/api/quickstart/python#set-up-environment
 
-然后将密钥文件放到默认路径，或设置环境变量 `BACKUP_GDRIVE_CLIENT_SECRET`。
+然后将密钥文件放到默认路径：`~/.config/backup-utilities/gdrive_client_secret.json`。
 
 ## 文档
 
-- 详细命令与环境变量：[`docs/quick-reference.md`](/home/quark/src/backup-utilities/docs/quick-reference.md)
-- 技术细节与行为说明：[`docs/technical-notes.md`](/home/quark/src/backup-utilities/docs/technical-notes.md)
+- 详细命令与环境变量：`docs/quick-reference.md`
+- 技术细节与行为说明：`docs/technical-notes.md`
