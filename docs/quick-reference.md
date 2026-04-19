@@ -2,7 +2,8 @@
 
 ## 常用环境变量
 
-- `BACKUP_ROOT`：备份根目录。
+- `BACKUP_PATH`：备份根目录（默认 `./backup`）。
+- `BACKUP_ROOT`：旧变量名，仍兼容（建议迁移到 `BACKUP_PATH`）。
 - `BACKUP_PASSPHRASE`：加密/解密口令。
 - `BACKUP_PLAIN_TRACEBACK=1`：TUI 异常时输出朴素 traceback。
 - `BACKUP_GDRIVE_CLIENT_SECRET`：Google OAuth 客户端密钥 JSON 路径。
@@ -12,7 +13,7 @@
 ## 常用命令
 
 ```bash
-# 初始化
+# 初始化（可选；多数命令会在备份目录不存在时自动初始化）
 uv run backup init
 
 # 状态
