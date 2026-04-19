@@ -175,7 +175,7 @@ class BackupTextualApp(App[None]):
             "Sel",
             "Excl",
             "Unit ID",
-            "Encrypt Policy",
+            "Encryption",
             "Last Snapshot Time",
             "Payload Size",
             "Last Check Time",
