@@ -25,7 +25,6 @@ from ..passphrase import (
     configure_keyring_uuid,
     get_passphrase,
     has_passphrase_cached,
-    set_cached_passphrase,
     validate_new_passphrase,
 )
 from ..protocols import default_registry
@@ -733,7 +732,8 @@ class BackupTextualApp(App[None]):
                 if not entered:
                     self._render_status("decrypt cancelled: empty passphrase")
                     return
-                set_cached_passphrase(entered)
+                keyring_status = cache_confirmed_passphrase(entered)
+                self._log(f"decrypt prompt passphrase keyring={keyring_status}")
                 passphrase = entered
 
         updated = 0

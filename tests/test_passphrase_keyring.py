@@ -38,6 +38,28 @@ def test_prompt_confirmed_passphrase_stores_in_configured_keyring(monkeypatch) -
         _reset_passphrase_state()
 
 
+def test_prompt_passphrase_without_confirmation_stores_in_configured_keyring(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_store(uuid: str, value: str) -> None:
+        calls.append((uuid, value))
+
+    monkeypatch.setattr(passphrase, "store_passphrase_in_keyring", fake_store)
+    _reset_passphrase_state()
+    passphrase.configure_keyring_uuid(TEST_UUID)
+    passphrase.set_prompt_func(lambda _prompt: "secret-no-confirm")
+
+    try:
+        result = passphrase.prompt_new_passphrase(confirm=False)
+        assert result == "secret-no-confirm"
+        assert calls == [(TEST_UUID, "secret-no-confirm")]
+        assert passphrase.get_passphrase(allow_prompt=False) == "secret-no-confirm"
+    finally:
+        _reset_passphrase_state()
+
+
 def test_get_passphrase_uses_configured_keyring_when_cache_empty(monkeypatch) -> None:
     calls: list[str] = []
 

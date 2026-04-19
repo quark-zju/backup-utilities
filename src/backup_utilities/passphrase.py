@@ -263,10 +263,7 @@ def prompt_new_passphrase(
         confirmation,
         require_confirmation=confirm,
     )
-    if confirm:
-        cache_confirmed_passphrase(out)
-    else:
-        set_cached_passphrase(out)
+    cache_confirmed_passphrase(out)
     return out
 
 
