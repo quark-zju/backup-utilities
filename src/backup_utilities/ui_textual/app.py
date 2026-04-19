@@ -163,6 +163,7 @@ class BackupTextualApp(App[None]):
             "Encrypt Policy",
             "Last Snapshot Time",
             "Payload Size",
+            "Last Check Time",
         )
         self.set_interval(0.2, self._drain_backup_events)
         self._backup_worker.start()
@@ -198,7 +199,7 @@ class BackupTextualApp(App[None]):
         self._restore_cursor(preferred_unit_id)
         self._render_status()
 
-    def _row_values(self, unit_id: str) -> tuple[str, str, str, str, str, str]:
+    def _row_values(self, unit_id: str) -> tuple[str, str, str, str, str, str, str]:
         row = self._state.all_rows[unit_id]
         marker = "x" if unit_id in self._state.selected_ids else ""
         excluded = "x" if row.excluded else ""
@@ -215,6 +216,7 @@ class BackupTextualApp(App[None]):
             row.encrypt_policy,
             _fmt_snapshot_date(row.last_snapshot_time),
             _fmt_size(row.payload_size_bytes),
+            _fmt_ts(row.last_verify_time),
         )
 
     def _update_visible_row(self, unit_id: str) -> None:
@@ -386,6 +388,7 @@ class BackupTextualApp(App[None]):
             3: "encrypt_policy",
             4: "last_snapshot_time",
             5: "payload_size_bytes",
+            6: "last_verify_time",
         }
         sort_column = column_map.get(event.cursor_column)
         if sort_column is None:
