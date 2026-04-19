@@ -42,6 +42,8 @@ from .screens import (
     ConfirmScreen,
     DiscoverCandidate,
     DiscoverSelectScreen,
+    ProtocolCandidate,
+    ProtocolSelectScreen,
     TextPromptScreen,
 )
 from .state import UnitListState
@@ -773,20 +775,28 @@ class BackupTextualApp(App[None]):
 
     async def _discover_add_flow(self) -> None:
         protocol_names = self._protocol_registry.protocol_names()
-        protocol_default = "github" if "github" in protocol_names else protocol_names[0]
-        protocol_raw = await self.push_screen_wait(
-            TextPromptScreen(
-                "Discover",
-                f"Protocol ({'/'.join(protocol_names)}):",
-                protocol_default,
+        if not protocol_names:
+            self._render_status("no protocol available")
+            return
+        protocol = await self.push_screen_wait(
+            ProtocolSelectScreen(
+                [
+                    ProtocolCandidate(
+                        protocol=name,
+                        info=(
+                            "GitHub repositories"
+                            if name == "github"
+                            else "Google Drive folders"
+                            if name == "google-drive"
+                            else "Protocol"
+                        ),
+                    )
+                    for name in protocol_names
+                ]
             )
         )
-        if protocol_raw is None:
+        if protocol is None:
             self._render_status("discover cancelled")
-            return
-        protocol = protocol_raw.strip()
-        if protocol not in protocol_names:
-            self._render_status(f"invalid protocol: {protocol}")
             return
 
         user: str | None = None

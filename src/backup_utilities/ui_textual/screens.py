@@ -17,6 +17,12 @@ class DiscoverCandidate:
     default_selected: bool
 
 
+@dataclass(slots=True)
+class ProtocolCandidate:
+    protocol: str
+    info: str
+
+
 class TextPromptScreen(Screen[str | None]):
     BINDINGS = [Binding("escape", "cancel", "Back")]
 
@@ -173,6 +179,60 @@ class DiscoverSelectScreen(Screen[list[str] | None]):
 
     def action_confirm(self) -> None:
         self.dismiss(sorted(self._selected))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class ProtocolSelectScreen(Screen[str | None]):
+    CSS = """
+    #protocol_root {
+      height: 1fr;
+    }
+    #protocol_table {
+      height: 1fr;
+    }
+    #protocol_hint {
+      height: auto;
+    }
+    """
+
+    BINDINGS = [
+        Binding("enter", "confirm", "Confirm"),
+        Binding("escape", "cancel", "Back"),
+    ]
+
+    def __init__(self, candidates: list[ProtocolCandidate]) -> None:
+        super().__init__()
+        self._candidates = candidates
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="protocol_root"):
+            yield Static("Select Protocol", id="protocol_title")
+            yield DataTable(id="protocol_table")
+            yield Static(
+                "Up/Down: move | Enter: confirm | Esc: cancel/back", id="protocol_hint"
+            )
+
+    def on_mount(self) -> None:
+        table = self.query_one("#protocol_table", DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Protocol", "Info")
+        for item in self._candidates:
+            table.add_row(item.protocol, item.info)
+        table.focus()
+
+    def _current_protocol(self) -> str | None:
+        table = self.query_one("#protocol_table", DataTable)
+        row_index = table.cursor_row
+        if row_index is None:
+            return None
+        if row_index < 0 or row_index >= len(self._candidates):
+            return None
+        return self._candidates[row_index].protocol
+
+    def action_confirm(self) -> None:
+        self.dismiss(self._current_protocol())
 
     def action_cancel(self) -> None:
         self.dismiss(None)
