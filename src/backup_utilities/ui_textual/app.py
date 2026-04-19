@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+import os
 from pathlib import Path
+import sys
+import traceback
 
 from textual import events
 from textual.app import App, ComposeResult
@@ -79,6 +82,22 @@ class BackupTextualApp(App[None]):
         self._root = root
         self._protocol_registry = default_registry()
         self._state = UnitListState()
+
+    def _fatal_error(self) -> None:
+        if os.environ.get("BACKUP_PLAIN_TRACEBACK") == "1":
+            error = self._exception
+            if error is not None:
+                traceback.print_exception(
+                    type(error),
+                    error,
+                    error.__traceback__,
+                    file=sys.stderr,
+                )
+            else:
+                traceback.print_exc(file=sys.stderr)
+            self._close_messages_no_wait()
+            return
+        super()._fatal_error()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)

@@ -18,6 +18,7 @@
 - `BACKUP_PASSPHRASE`：加密/解密口令。
   - 若未设置，仅在交互式 TTY 下提示输入。
   - 非交互场景（如管道/CI）未设置时会报错。
+- `BACKUP_PLAIN_TRACEBACK=1`：Textual TUI 异常时输出朴素 Python traceback（便于复制粘贴）。
 
 ## 使用示例
 
