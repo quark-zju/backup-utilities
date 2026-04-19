@@ -21,6 +21,22 @@ def encrypted_payload_path(root: Path, unit_id: str) -> Path:
     return unit_dir(root, unit_id) / "payload.tar.zst.enc"
 
 
+def resolve_payload_path(root: Path, unit_id: str, payload_rel: str) -> Path:
+    rel = Path(payload_rel)
+    if rel.is_absolute():
+        return rel
+    # New format: relative to unit directory.
+    unit_based = unit_dir(root, unit_id) / rel
+    if unit_based.exists():
+        return unit_based
+    # Backward compatibility: older metadata used root-relative payload path.
+    return root / rel
+
+
+def payload_rel_for_metadata(root: Path, unit_id: str, payload_abs: Path) -> str:
+    return str(payload_abs.relative_to(unit_dir(root, unit_id)))
+
+
 def read_json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 

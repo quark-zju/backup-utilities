@@ -14,8 +14,10 @@ from .storage import (
     encrypted_payload_path,
     metadata_path,
     now_utc,
+    payload_rel_for_metadata,
     payload_path,
     read_json,
+    resolve_payload_path,
     unit_dir,
     write_json_atomic,
 )
@@ -171,7 +173,7 @@ def run_backup(
                     },
                     "source_fingerprint": fingerprint.fingerprint,
                     "payload": {
-                        "path": str(final_payload.relative_to(root)),
+                        "path": payload_rel_for_metadata(root, unit_id, final_payload),
                         "size_bytes": size_bytes,
                         "sha256": digest,
                         "compressed": "zstd",
@@ -223,7 +225,7 @@ def verify_units(root: Path, unit: str | None) -> int:
         meta = read_json(meta_path)
         check_time = now_utc()
         payload_rel = meta["payload"]["path"]
-        payload = root / str(payload_rel)
+        payload = resolve_payload_path(root, unit_id, str(payload_rel))
         if not payload.exists():
             print(f"missing payload: {unit_id}")
             meta["verify"] = {

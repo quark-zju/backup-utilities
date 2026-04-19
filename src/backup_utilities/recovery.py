@@ -11,8 +11,10 @@ from .passphrase import clear_cached_passphrase, get_passphrase, prompt_new_pass
 from .storage import (
     encrypted_payload_path,
     metadata_path,
+    payload_rel_for_metadata,
     payload_path,
     read_json,
+    resolve_payload_path,
     write_json_atomic,
 )
 
@@ -31,9 +33,9 @@ def decrypt_unit_payload(root: Path, unit_id: str, out: Path) -> int:
     payload_rel = str(payload_info.get("path", ""))
     if not payload_rel:
         raise ValueError(f"metadata payload.path missing: {unit_id}")
-    payload_path = root / payload_rel
-    if not payload_path.exists():
-        raise FileNotFoundError(f"payload not found: {payload_path}")
+    payload_path_value = resolve_payload_path(root, unit_id, payload_rel)
+    if not payload_path_value.exists():
+        raise FileNotFoundError(f"payload not found: {payload_path_value}")
 
     out = out.resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -47,7 +49,7 @@ def decrypt_unit_payload(root: Path, unit_id: str, out: Path) -> int:
     passphrase = get_passphrase()
     try:
         decrypt_file(
-            input_path=payload_path,
+            input_path=payload_path_value,
             output_path=out,
             passphrase=passphrase,
             aad_context=aad_context,
@@ -57,7 +59,7 @@ def decrypt_unit_payload(root: Path, unit_id: str, out: Path) -> int:
         clear_cached_passphrase()
         retry_passphrase = prompt_new_passphrase("Backup passphrase (retry): ")
         decrypt_file(
-            input_path=payload_path,
+            input_path=payload_path_value,
             output_path=out,
             passphrase=retry_passphrase,
             aad_context=aad_context,
@@ -84,8 +86,8 @@ def verify_unit_passphrase(root: Path, unit_id: str, passphrase: str) -> str:
     payload_rel = str(payload_info.get("path", ""))
     if not payload_rel:
         return "error"
-    payload_path = root / payload_rel
-    if not payload_path.exists():
+    payload_path_value = resolve_payload_path(root, unit_id, payload_rel)
+    if not payload_path_value.exists():
         return "error"
 
     aad_context = {
@@ -96,7 +98,7 @@ def verify_unit_passphrase(root: Path, unit_id: str, passphrase: str) -> str:
 
     try:
         verify_passphrase_for_file(
-            input_path=payload_path,
+            input_path=payload_path_value,
             passphrase=passphrase,
             aad_context=aad_context,
         )
@@ -134,7 +136,7 @@ def set_unit_payload_encryption(
     payload_rel = str(payload_info.get("path", ""))
     if not payload_rel:
         return "missing"
-    current_payload = root / payload_rel
+    current_payload = resolve_payload_path(root, unit_id, payload_rel)
     if not current_payload.exists():
         return "missing"
 
@@ -160,7 +162,7 @@ def set_unit_payload_encryption(
         payload_path(root, unit_id).unlink(missing_ok=True)
         meta["payload"] = {
             **payload_info,
-            "path": str(final_payload.relative_to(root)),
+            "path": payload_rel_for_metadata(root, unit_id, final_payload),
             "size_bytes": enc.size_bytes,
             "sha256": enc.sha256_hex,
             "encrypted": True,
@@ -186,7 +188,7 @@ def set_unit_payload_encryption(
         encrypted_payload_path(root, unit_id).unlink(missing_ok=True)
         meta["payload"] = {
             **payload_info,
-            "path": str(final_payload.relative_to(root)),
+            "path": payload_rel_for_metadata(root, unit_id, final_payload),
             "size_bytes": size_bytes,
             "sha256": digest,
             "encrypted": False,
