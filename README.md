@@ -1,6 +1,6 @@
 # backup-utilities
 
-面向“备份单元”的增量备份工具。当前已实现 GitHub 协议，产物默认为每单元少量文件：
+面向“备份单元”的增量备份工具。当前已实现 GitHub 与 Google Drive 协议，产物默认为每单元少量文件：
 - `metadata.json`（明文元数据）
 - `payload.tar.zst` 或 `payload.tar.zst.enc`（可选加密载荷）
 
@@ -24,6 +24,9 @@
 - TUI 口令输入：当触发需要口令的备份时弹窗输入（不回显）。
 - 解密时若复用口令失败，会提示重新输入并自动重试一次。
 - `BACKUP_PLAIN_TRACEBACK=1`：Textual TUI 异常时输出朴素 Python traceback（便于复制粘贴）。
+- `BACKUP_GDRIVE_CLIENT_SECRET`：Google OAuth 客户端密钥 JSON 路径（默认 `~/.config/backup-utilities/gdrive_client_secret.json`）。
+- `BACKUP_GDRIVE_TOKEN_CACHE`：Google OAuth token 缓存路径（默认 `~/.cache/backup-utilities/gdrive_token.json`）。
+- `BACKUP_GDRIVE_SERVICE_ACCOUNT_JSON`：可选，若设置则使用 Service Account 认证（并跳过本地 OAuth 登录流程）。
 
 ## 使用示例
 
@@ -44,14 +47,16 @@ uv run backup status
 ### 2. 发现并选择备份单元
 
 ```bash
-# discover 是协议路由入口；当前支持 github
+# discover 是协议路由入口；当前支持 github / google-drive
 uv run backup discover github --limit 50
+uv run backup discover google-drive --limit 50
 
 # 也可显式指定账号/组织
 uv run backup discover github --user your-github-user --limit 50
 
 # 选择或排除单元
 uv run backup select add github/owner/repo
+uv run backup select add gdrive/folder/<folder_id>
 uv run backup select remove github/owner/repo
 # 仅加入 exclude（不改 include）
 uv run backup select exclude github/owner/repo
@@ -141,6 +146,7 @@ mtime:>=2026-01-01 ctime:<2026-06-01
 ## 依赖说明
 
 - GitHub 协议依赖：`gh` CLI（需先 `gh auth login`）
+- Google Drive 协议依赖：Google 官方 Python API 客户端（`google-api-python-client`, `google-auth-oauthlib`）
 - 加密实现：`AES-256-GCM + scrypt`（通过 `cryptography`）
 - TUI 依赖：`textual`
 
