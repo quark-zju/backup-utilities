@@ -44,6 +44,7 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
         meta = read_json(meta_path) if meta_path.exists() else {}
         payload = meta.get("payload", {}) if isinstance(meta, dict) else {}
         verify = meta.get("verify", {}) if isinstance(meta, dict) else {}
+        check = meta.get("check", {}) if isinstance(meta, dict) else {}
 
         if unit_id in cfg.unit_encrypt:
             policy = "forced-encrypt"
@@ -76,7 +77,11 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
                     else None
                 ),
                 last_verify_time=(
-                    str(verify.get("last_check_time"))
+                    str(check.get("last_check_time"))
+                    if isinstance(check, dict) and check.get("last_check_time")
+                    else str(meta.get("snapshot_time"))
+                    if meta.get("snapshot_time")
+                    else str(verify.get("last_check_time"))
                     if isinstance(verify, dict) and verify.get("last_check_time")
                     else None
                 ),

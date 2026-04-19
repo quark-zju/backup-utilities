@@ -68,6 +68,7 @@ def run_backup(
         protocol = registry.protocol_for_unit(unit_id)
         unit_meta_path = metadata_path(root, unit_id)
         prev = read_json(unit_meta_path) if unit_meta_path.exists() else None
+        check_time = now_utc()
 
         try:
             fingerprint = protocol.compute_fingerprint(unit_id)
@@ -79,6 +80,12 @@ def run_backup(
 
         if prev_fp == fingerprint.fingerprint:
             print(f"skip unchanged: {unit_id}")
+            if prev is not None:
+                prev["check"] = {
+                    "last_check_time": check_time,
+                    "status": "unchanged",
+                }
+                write_json_atomic(unit_meta_path, prev)
             continue
 
         changed += 1
@@ -136,6 +143,10 @@ def run_backup(
                     "unit_id": unit_id,
                     "protocol": protocol.name,
                     "snapshot_time": snapshot_time,
+                    "check": {
+                        "last_check_time": check_time,
+                        "status": "updated",
+                    },
                     "source_fingerprint": fingerprint.fingerprint,
                     "payload": {
                         "path": str(final_payload.relative_to(root)),
