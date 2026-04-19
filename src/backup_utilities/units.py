@@ -11,6 +11,7 @@ from .storage import read_json
 class UnitRow:
     unit_id: str
     unit_label: str
+    protocol_metadata: dict[str, object]
     selected: bool
     excluded: bool
     encrypt_policy: str
@@ -66,6 +67,9 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
             UnitRow(
                 unit_id=unit_id,
                 unit_label=unit_label,
+                protocol_metadata=(
+                    dict(protocol_meta) if isinstance(protocol_meta, dict) else {}
+                ),
                 selected=unit_id in cfg.unit_include
                 and unit_id not in cfg.unit_exclude,
                 excluded=unit_id in cfg.unit_exclude,

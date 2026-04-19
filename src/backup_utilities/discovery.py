@@ -5,6 +5,7 @@ from pathlib import Path
 from .config import load_config
 from .protocols import ProtocolRegistry
 from .protocols.base import DiscoveredUnit
+from .storage import metadata_path, read_json, write_json_atomic
 
 
 def _known_unit_ids(root: Path) -> set[str]:
@@ -60,3 +61,30 @@ def format_discovered(units: list[DiscoveredUnit]) -> list[str]:
             )
         )
     return lines
+
+
+def write_partial_metadata_from_discovered(
+    *,
+    root: Path,
+    protocol_name: str,
+    discovered: list[DiscoveredUnit],
+    chosen_unit_ids: list[str],
+) -> None:
+    by_id = {item.unit_id: item for item in discovered}
+    for unit_id in chosen_unit_ids:
+        item = by_id.get(unit_id)
+        if item is None:
+            continue
+
+        path = metadata_path(root, unit_id)
+        meta = read_json(path) if path.exists() else {}
+        payload = meta.get("payload")
+        if isinstance(payload, dict) and isinstance(payload.get("encrypted"), bool):
+            # Existing full metadata already has effective encryption state.
+            continue
+
+        meta["unit_id"] = unit_id
+        meta["protocol"] = protocol_name
+        meta["protocol_metadata"] = dict(item.details)
+        meta["meta_state"] = "partial"
+        write_json_atomic(path, meta)

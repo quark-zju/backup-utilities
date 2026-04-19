@@ -90,14 +90,16 @@ class GithubProtocol(BackupProtocol):
             owner, repo = name_with_owner.split("/", maxsplit=1)
             is_fork = bool(item.get("isFork", False))
             visibility = str(item.get("visibility", "UNKNOWN"))
+            is_private = visibility.upper() == "PRIVATE"
             units.append(
                 DiscoveredUnit(
                     unit_id=f"github/{owner}/{repo}",
                     default_selected=not is_fork,
-                    default_encrypt=visibility.upper() == "PRIVATE",
+                    default_encrypt=is_private,
                     details={
                         "fork": is_fork,
                         "visibility": visibility,
+                        "private": is_private,
                         "pushed_at": item.get("pushedAt"),
                     },
                 )

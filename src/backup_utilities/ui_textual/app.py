@@ -17,7 +17,7 @@ from textual.containers import Vertical
 from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from ..config import load_config
-from ..discovery import discover_units
+from ..discovery import discover_units, write_partial_metadata_from_discovered
 from ..logging_utils import append_log
 from ..passphrase import (
     clear_cached_passphrase,
@@ -559,11 +559,14 @@ class BackupTextualApp(App[None]):
             if row.encrypt_policy == "encrypted":
                 return True
             if row.encrypt_policy == "auto(initial)":
-                if unit_id.startswith("gdrive/"):
-                    return True
-                if cfg.default_encrypt:
-                    return True
-                if unit_id.startswith("github/") and cfg.github_default_private_encrypt:
+                protocol = self._protocol_registry.protocol_for_unit(unit_id)
+                auto = protocol.should_encrypt_auto(
+                    protocol_metadata=row.protocol_metadata,
+                    cfg=cfg,
+                )
+                if auto is None:
+                    auto = cfg.default_encrypt
+                if auto:
                     return True
         return False
 
@@ -932,6 +935,12 @@ class BackupTextualApp(App[None]):
         for unit_id in chosen:
             select_add(self._root, unit_id)
             self._state.selected_ids.add(unit_id)
+        write_partial_metadata_from_discovered(
+            root=self._root,
+            protocol_name=protocol,
+            discovered=discovered,
+            chosen_unit_ids=chosen,
+        )
 
         self.action_reload_units()
         self._render_status(f"discover added units={len(chosen)}")
