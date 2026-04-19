@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import tempfile
 
 from cryptography.exceptions import InvalidTag
 
 from .crypto import decrypt_file, verify_passphrase_for_file
-from .archive import sha256_file
+from .archive import extract_tar_zstd, sha256_file
 from .crypto import encrypt_file
 from .passphrase import clear_cached_passphrase, get_passphrase, prompt_new_passphrase
 from .storage import (
@@ -66,6 +67,75 @@ def decrypt_unit_payload(root: Path, unit_id: str, out: Path) -> int:
         )
     print(f"decrypted to: {out}")
     return 0
+
+
+def restore_unit_payload(root: Path, unit_id: str, out_dir: Path) -> Path:
+    meta_path = metadata_path(root, unit_id)
+    if not meta_path.exists():
+        raise FileNotFoundError(f"metadata not found: {meta_path}")
+
+    meta = read_json(meta_path)
+    payload_info = meta.get("payload", {})
+    if not isinstance(payload_info, dict):
+        raise ValueError(f"metadata payload missing: {unit_id}")
+
+    payload_rel = str(payload_info.get("path", ""))
+    if not payload_rel:
+        raise ValueError(f"metadata payload.path missing: {unit_id}")
+
+    payload_path_value = resolve_payload_path(root, unit_id, payload_rel)
+    if not payload_path_value.exists():
+        raise FileNotFoundError(f"payload not found: {payload_path_value}")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if bool(payload_info.get("encrypted", False)):
+        _restore_encrypted_payload(
+            payload_path_value=payload_path_value,
+            payload_rel=payload_rel,
+            unit_id=unit_id,
+            snapshot_time=str(meta.get("snapshot_time", "")),
+            out_dir=out_dir,
+        )
+    else:
+        extract_tar_zstd(payload_path_value, out_dir)
+    return out_dir
+
+
+def _restore_encrypted_payload(
+    *,
+    payload_path_value: Path,
+    payload_rel: str,
+    unit_id: str,
+    snapshot_time: str,
+    out_dir: Path,
+) -> None:
+    aad_context = {
+        "unit_id": unit_id,
+        "snapshot_time": snapshot_time,
+        "payload_name": Path(payload_rel).name,
+    }
+
+    with tempfile.TemporaryDirectory(prefix="backup-restore-") as tmp:
+        decrypted_archive = Path(tmp) / "payload.tar.zst"
+        passphrase = get_passphrase()
+        try:
+            decrypt_file(
+                input_path=payload_path_value,
+                output_path=decrypted_archive,
+                passphrase=passphrase,
+                aad_context=aad_context,
+            )
+        except (InvalidTag, ValueError):
+            # Cached/env passphrase may be stale; require re-entry once.
+            clear_cached_passphrase()
+            retry_passphrase = prompt_new_passphrase("Backup passphrase (retry): ")
+            decrypt_file(
+                input_path=payload_path_value,
+                output_path=decrypted_archive,
+                passphrase=retry_passphrase,
+                aad_context=aad_context,
+            )
+        extract_tar_zstd(decrypted_archive, out_dir)
 
 
 def verify_unit_passphrase(root: Path, unit_id: str, passphrase: str) -> str:

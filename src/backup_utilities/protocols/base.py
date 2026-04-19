@@ -44,8 +44,16 @@ class BackupProtocol(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def export_snapshot(self, unit_id: str, staging_dir: Path) -> ExportResult:
+    def export_snapshot(
+        self,
+        unit_id: str,
+        staging_dir: Path,
+        previous_snapshot_dir: Path | None = None,
+    ) -> ExportResult:
         raise NotImplementedError
+
+    def wants_previous_snapshot(self) -> bool:
+        return False
 
     def should_encrypt_auto(
         self, *, protocol_metadata: dict[str, object], cfg: Config

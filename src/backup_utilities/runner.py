@@ -9,6 +9,7 @@ from .crypto import encrypt_file
 from .layout import load_index
 from .logging_utils import append_log
 from .passphrase import get_passphrase
+from .recovery import restore_unit_payload
 from .protocols import ProtocolRegistry
 from .storage import (
     encrypted_payload_path,
@@ -118,7 +119,18 @@ def run_backup(
         try:
             with tempfile.TemporaryDirectory(prefix="backup-unit-") as tmp:
                 staging = Path(tmp)
-                exported = protocol.export_snapshot(unit_id, staging)
+                previous_snapshot_dir = _restore_previous_snapshot_if_needed(
+                    root=root,
+                    unit_id=unit_id,
+                    protocol=protocol,
+                    prev_meta=prev,
+                    staging_dir=staging,
+                )
+                exported = protocol.export_snapshot(
+                    unit_id,
+                    staging,
+                    previous_snapshot_dir=previous_snapshot_dir,
+                )
                 target_dir = unit_dir(root, unit_id)
                 target_dir.mkdir(parents=True, exist_ok=True)
                 snapshot_time = now_utc()
@@ -205,6 +217,26 @@ def run_backup(
     append_log(root, "runner", f"backup summary changed={changed} failed={failed}")
     print(f"done. changed units: {changed}, failed units: {failed}")
     return 1 if failed else 0
+
+
+def _restore_previous_snapshot_if_needed(
+    *,
+    root: Path,
+    unit_id: str,
+    protocol,
+    prev_meta: dict[str, object] | None,
+    staging_dir: Path,
+) -> Path | None:
+    if prev_meta is None or not protocol.wants_previous_snapshot():
+        return None
+
+    payload_info = prev_meta.get("payload")
+    if not isinstance(payload_info, dict) or not payload_info.get("path"):
+        return None
+
+    previous_snapshot_dir = staging_dir / "previous"
+    restore_unit_payload(root, unit_id, previous_snapshot_dir)
+    return previous_snapshot_dir
 
 
 def verify_units(root: Path, unit: str | None) -> int:

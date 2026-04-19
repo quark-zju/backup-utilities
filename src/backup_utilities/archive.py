@@ -21,6 +21,21 @@ def create_tar_zstd(source_path: Path, output_path: Path) -> None:
         raise RuntimeError(f"tar failed: {res.stderr.strip()}")
 
 
+def extract_tar_zstd(archive_path: Path, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "tar",
+        "--zstd",
+        "-xf",
+        str(archive_path),
+        "-C",
+        str(output_dir),
+    ]
+    res = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"tar extract failed: {res.stderr.strip()}")
+
+
 def sha256_file(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as fh:

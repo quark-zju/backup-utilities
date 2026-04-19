@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
+import shutil
 import re
 import subprocess
 from typing import TYPE_CHECKING
@@ -165,21 +166,71 @@ class GithubProtocol(BackupProtocol):
             },
         )
 
-    def export_snapshot(self, unit_id: str, staging_dir: Path) -> ExportResult:
+    def wants_previous_snapshot(self) -> bool:
+        return True
+
+    def export_snapshot(
+        self,
+        unit_id: str,
+        staging_dir: Path,
+        previous_snapshot_dir: Path | None = None,
+    ) -> ExportResult:
         ident = self._parse_unit_id(unit_id)
         clone_target = staging_dir / f"{ident.repo}.git"
-        _run(
-            [
-                "gh",
-                "repo",
-                "clone",
-                f"{ident.owner}/{ident.repo}",
-                str(clone_target),
-                "--",
-                "--mirror",
-            ]
-        )
+
+        restored_repo = self._find_restored_repo(previous_snapshot_dir)
+        if restored_repo is None:
+            _run(
+                [
+                    "gh",
+                    "repo",
+                    "clone",
+                    f"{ident.owner}/{ident.repo}",
+                    str(clone_target),
+                    "--",
+                    "--mirror",
+                ]
+            )
+        else:
+            shutil.move(str(restored_repo), str(clone_target))
+            self._run_git(
+                clone_target,
+                ["git", "fetch", "--prune", "--tags", "origin", "+refs/*:refs/*"],
+            )
+            self._run_git(
+                clone_target,
+                ["git", "repack", "-a", "-d", "--write-bitmap-index"],
+            )
         return ExportResult(source_path=clone_target)
+
+    @staticmethod
+    def _find_restored_repo(previous_snapshot_dir: Path | None) -> Path | None:
+        if previous_snapshot_dir is None or not previous_snapshot_dir.exists():
+            return None
+
+        candidates = [path for path in previous_snapshot_dir.iterdir() if path.is_dir()]
+        if len(candidates) != 1:
+            return None
+
+        repo_dir = candidates[0]
+        if repo_dir.suffix != ".git":
+            return None
+        if not (repo_dir / "config").exists() or not (repo_dir / "objects").is_dir():
+            return None
+        return repo_dir
+
+    @staticmethod
+    def _run_git(workdir: Path, cmd: list[str]) -> str:
+        res = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            cwd=workdir,
+        )
+        if res.returncode != 0:
+            raise RuntimeError(f"command failed: {' '.join(cmd)}\n{res.stderr.strip()}")
+        return res.stdout
 
     @staticmethod
     def _parse_unit_id(unit_id: str) -> _RepoIdentity:
