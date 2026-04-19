@@ -36,6 +36,16 @@
 gh auth login
 ```
 
+### 0.1 Google Drive 首次配置（首次使用）
+
+- 按官方 quickstart 完成 Google Drive API 环境设置：  
+  https://developers.google.com/workspace/drive/api/quickstart/python#set-up-environment
+- 在 Google Cloud Console 中创建 OAuth Client（Desktop app），下载客户端密钥 JSON。
+- 将下载的 JSON 放到以下任一路径：
+  - `BACKUP_GDRIVE_CLIENT_SECRET` 指向的路径
+  - 默认路径：`~/.config/backup-utilities/gdrive_client_secret.json`
+- 首次执行 `backup discover google-drive` 或 `backup run` 时会触发 OAuth 登录并生成 token 缓存（默认 `~/.cache/backup-utilities/gdrive_token.json`）。
+
 ### 1. 初始化与查看状态
 
 ```bash
