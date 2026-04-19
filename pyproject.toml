@@ -14,6 +14,8 @@ dependencies = [
     "google-api-python-client>=2.0.0",
     "google-auth-oauthlib>=1.2.0",
     "keyring>=25.7.0",
+    # Optional runtime backend support for keyring on Linux (for example KWallet via D-Bus).
+    "dbus-python>=1.3.2; sys_platform == 'linux'",
 ]
 
 [project.scripts]
