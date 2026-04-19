@@ -33,7 +33,6 @@ def _selected_units(root: Path, unit_arg: str | None) -> list[str]:
 
 def _should_encrypt(
     *,
-    unit_id: str,
     cfg: Config,
     protocol,
     protocol_metadata: dict[str, object],
@@ -45,12 +44,6 @@ def _should_encrypt(
             payload_raw.get("encrypted"), bool
         ):
             return bool(payload_raw["encrypted"])
-
-    # Legacy config fallback: only for units without known payload state.
-    if unit_id in cfg.unit_encrypt:
-        return True
-    if unit_id in cfg.unit_decrypt:
-        return False
 
     protocol_default = protocol.should_encrypt_auto(
         protocol_metadata=protocol_metadata,
@@ -132,7 +125,6 @@ def run_backup(
                 create_tar_zstd(exported.source_path, archive_tmp)
 
                 encrypt = _should_encrypt(
-                    unit_id=unit_id,
                     cfg=cfg,
                     protocol=protocol,
                     protocol_metadata=fingerprint.protocol_metadata,

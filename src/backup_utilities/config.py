@@ -17,8 +17,6 @@ class Config:
     github_default_private_encrypt: bool = True
     unit_include: list[str] = field(default_factory=list)
     unit_exclude: list[str] = field(default_factory=list)
-    unit_encrypt: list[str] = field(default_factory=list)
-    unit_decrypt: list[str] = field(default_factory=list)
 
 
 def config_path(root: Path) -> Path:
@@ -35,8 +33,6 @@ def write_config(root: Path, cfg: Config) -> None:
 
     include = ", ".join(f'"{x}"' for x in cfg.unit_include)
     exclude = ", ".join(f'"{x}"' for x in cfg.unit_exclude)
-    encrypt = ", ".join(f'"{x}"' for x in cfg.unit_encrypt)
-    decrypt = ", ".join(f'"{x}"' for x in cfg.unit_decrypt)
 
     content = "\n".join(
         [
@@ -53,8 +49,6 @@ def write_config(root: Path, cfg: Config) -> None:
             "[units]",
             f"include = [{include}]",
             f"exclude = [{exclude}]",
-            f"encrypt = [{encrypt}]",
-            f"decrypt = [{decrypt}]",
             "",
         ]
     )
@@ -65,13 +59,11 @@ def _ensure_str_list(value: object) -> list[str]:
     if value is None:
         return []
     if not isinstance(value, list):
-        raise ValueError("units.include/exclude/encrypt/decrypt must be list")
+        raise ValueError("units.include/exclude must be list")
     out: list[str] = []
     for item in value:
         if not isinstance(item, str):
-            raise ValueError(
-                "units.include/exclude/encrypt/decrypt entries must be string"
-            )
+            raise ValueError("units.include/exclude entries must be string")
         out.append(item)
     return out
 
@@ -98,6 +90,4 @@ def load_config(root: Path) -> Config:
         ),
         unit_include=_ensure_str_list(units_cfg.get("include")),
         unit_exclude=_ensure_str_list(units_cfg.get("exclude")),
-        unit_encrypt=_ensure_str_list(units_cfg.get("encrypt")),
-        unit_decrypt=_ensure_str_list(units_cfg.get("decrypt")),
     )

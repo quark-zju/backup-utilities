@@ -64,8 +64,6 @@ def _cmd_status(args: argparse.Namespace) -> int:
     print(f"root: {root}")
     print(f"selected units: {len(cfg.unit_include)}")
     print(f"excluded units: {len(cfg.unit_exclude)}")
-    print(f"legacy force-encrypt entries: {len(cfg.unit_encrypt)}")
-    print(f"legacy force-decrypt entries: {len(cfg.unit_decrypt)}")
     print(f"indexed snapshots: {len(index)}")
     return 0
 
