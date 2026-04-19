@@ -113,7 +113,7 @@ v      对选中项执行 toggle exclude（已 exclude 则取消）
 p      对选中项验证当前口令（不解密落盘）
 x      从 selected 中移除（带确认）
 m      手动添加 unit
-f      discover 后批量添加
+f      discover（先选 protocol）后批量添加
 Ctrl+E 口令管理（有缓存则清除；无缓存则输入并缓存）
 r      刷新列表
 q      退出

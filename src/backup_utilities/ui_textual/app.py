@@ -772,20 +772,39 @@ class BackupTextualApp(App[None]):
         self.run_worker(self._discover_add_flow(), thread=False, exclusive=True)
 
     async def _discover_add_flow(self) -> None:
-        protocol = "github"
-        user = await self.push_screen_wait(
+        protocol_names = self._protocol_registry.protocol_names()
+        protocol_default = "github" if "github" in protocol_names else protocol_names[0]
+        protocol_raw = await self.push_screen_wait(
             TextPromptScreen(
-                "Discover GitHub",
-                "GitHub user/org (empty = infer from gh auth):",
-                "",
+                "Discover",
+                f"Protocol ({'/'.join(protocol_names)}):",
+                protocol_default,
             )
         )
-        if user is None:
+        if protocol_raw is None:
             self._render_status("discover cancelled")
             return
+        protocol = protocol_raw.strip()
+        if protocol not in protocol_names:
+            self._render_status(f"invalid protocol: {protocol}")
+            return
+
+        user: str | None = None
+        if protocol == "github":
+            user_value = await self.push_screen_wait(
+                TextPromptScreen(
+                    "Discover GitHub",
+                    "GitHub user/org (empty = infer from gh auth):",
+                    "",
+                )
+            )
+            if user_value is None:
+                self._render_status("discover cancelled")
+                return
+            user = user_value.strip() or None
 
         limit_raw = await self.push_screen_wait(
-            TextPromptScreen("Discover GitHub", "Max units:", "50")
+            TextPromptScreen("Discover", "Max units:", "50")
         )
         if limit_raw is None:
             self._render_status("discover cancelled")
@@ -801,7 +820,7 @@ class BackupTextualApp(App[None]):
                 discover_units,
                 self._protocol_registry,
                 protocol,
-                user=user.strip() or None,
+                user=user,
                 limit=limit,
             )
         except Exception as exc:
