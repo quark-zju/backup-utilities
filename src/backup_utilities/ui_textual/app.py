@@ -254,6 +254,9 @@ class BackupTextualApp(App[None]):
         ]
         if self._state.query_error:
             chunks.append(f"query_error={self._state.query_error}")
+        sort_summary = self._state.sort_summary()
+        if sort_summary:
+            chunks.append(f"sort={sort_summary}")
         if message:
             chunks.append(message)
         status.update(" | ".join(chunks))
@@ -373,6 +376,26 @@ class BackupTextualApp(App[None]):
         if row < 0 or row >= len(self._state.visible_ids):
             return
         self._state.focused_id = self._state.visible_ids[row]
+
+    def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
+        if event.data_table.id != "units_table":
+            return
+
+        column_map = {
+            0: "selected",
+            1: "excluded",
+            2: "unit_id",
+            3: "encrypt_policy",
+            4: "last_snapshot_time",
+            5: "payload_size_bytes",
+            6: "last_verify_time",
+        }
+        sort_column = column_map.get(event.cursor_column)
+        if sort_column is None:
+            return
+        keep_id = self._state.focused_id or self._current_unit_id()
+        self._state.set_sort(sort_column)
+        self._render_table(preferred_unit_id=keep_id)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id != "search":
