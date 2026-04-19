@@ -75,11 +75,48 @@ uv run backup decrypt-unit --unit github/owner/repo --out /tmp/github-owner-repo
 ### 6. 启动 TUI
 
 ```bash
+# 首次请先同步依赖（包含 textual）
+uv sync
 uv run backup tui
+```
+
+### 7. Textual TUI 快捷键（MVP）
+
+```text
+/      聚焦搜索框
+Space  切换当前行选中
+a      全选当前可见项
+n      全不选当前可见项
+b      对选中项串行执行 backup
+e      对选中项执行 force encrypt（已是 encrypt 跳过）
+d      对选中项执行 force decrypt（已是 decrypt 跳过）
+x      从 selected 中移除（带确认）
+m      手动添加 unit
+f      discover 后批量添加
+r      刷新列表
+q      退出
+```
+
+### 8. 搜索语法（MVP）
+
+- 自由文本：按 `unit_id` 子串过滤，多个词为 AND
+- 冒号条件：
+  - `mtime:<op><date>`：上次备份时间
+  - `ctime:<op><date>`：上次检查时间
+- 运算符：`> >= < <= = !=`
+- 日期：`YYYY-M-D` 或 `YYYY-MM-DD`
+
+示例：
+
+```text
+github/foo
+github mtime:>2026-1-1
+ctime:>=2026-04-01
+mtime:>=2026-01-01 ctime:<2026-06-01
 ```
 
 ## 依赖说明
 
 - GitHub 协议依赖：`gh` CLI（需先 `gh auth login`）
 - 加密实现：`AES-256-GCM + scrypt`（通过 `cryptography`）
-- TUI 依赖：系统需安装 `whiptail`
+- TUI 依赖：`textual`

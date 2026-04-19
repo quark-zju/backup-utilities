@@ -101,7 +101,14 @@ def _cmd_decrypt_unit(args: argparse.Namespace) -> int:
 
 def _cmd_tui(args: argparse.Namespace) -> int:
     root = _resolve_root(args)
-    from .ui_textual import run_tui
+    try:
+        from .ui_textual import run_tui
+    except ModuleNotFoundError as exc:
+        if exc.name == "textual":
+            raise RuntimeError(
+                "textual is not installed; run dependency sync first (e.g. uv sync)"
+            ) from exc
+        raise
 
     return run_tui(root)
 
