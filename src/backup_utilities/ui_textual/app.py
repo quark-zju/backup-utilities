@@ -551,23 +551,14 @@ class BackupTextualApp(App[None]):
         return []
 
     def _selected_need_passphrase(self, selected: list[str]) -> bool:
-        cfg = load_config(self._root)
         for unit_id in selected:
             row = self._state.all_rows.get(unit_id)
             if row is None:
                 continue
             if row.encrypt_policy == "encrypted":
                 return True
-            if row.encrypt_policy == "auto(initial)":
-                protocol = self._protocol_registry.protocol_for_unit(unit_id)
-                auto = protocol.should_encrypt_auto(
-                    protocol_metadata=row.protocol_metadata,
-                    cfg=cfg,
-                )
-                if auto is None:
-                    auto = cfg.default_encrypt
-                if auto:
-                    return True
+            if row.encrypt_policy == "initial-encrypted":
+                return True
         return False
 
     def action_backup_selected(self) -> None:
