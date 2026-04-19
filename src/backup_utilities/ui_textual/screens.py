@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.coordinate import Coordinate
 from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import DataTable, Input, Static
@@ -103,8 +104,29 @@ class DiscoverSelectScreen(Screen[list[str] | None]):
         table = self.query_one("#discover_table", DataTable)
         table.clear(columns=False)
         for candidate in self._candidates:
-            mark = "[x]" if candidate.unit_id in self._selected else "[ ]"
+            mark = self._selection_marker(candidate.unit_id)
             table.add_row(mark, candidate.unit_id, candidate.info)
+
+    def _selection_marker(self, unit_id: str) -> str:
+        return "x" if unit_id in self._selected else ""
+
+    def _update_selection_cell(self, unit_id: str) -> None:
+        if unit_id not in self._visible_ids:
+            return
+        row_index = self._visible_ids.index(unit_id)
+        table = self.query_one("#discover_table", DataTable)
+        table.update_cell_at(
+            Coordinate(row_index, 0),
+            self._selection_marker(unit_id),
+        )
+
+    def _update_all_selection_cells(self) -> None:
+        table = self.query_one("#discover_table", DataTable)
+        for row_index, unit_id in enumerate(self._visible_ids):
+            table.update_cell_at(
+                Coordinate(row_index, 0),
+                self._selection_marker(unit_id),
+            )
 
     def _current_unit_id(self) -> str | None:
         table = self.query_one("#discover_table", DataTable)
@@ -123,15 +145,15 @@ class DiscoverSelectScreen(Screen[list[str] | None]):
             self._selected.remove(unit_id)
         else:
             self._selected.add(unit_id)
-        self._render_table()
+        self._update_selection_cell(unit_id)
 
     def action_all(self) -> None:
         self._selected = set(self._visible_ids)
-        self._render_table()
+        self._update_all_selection_cells()
 
     def action_none(self) -> None:
         self._selected.clear()
-        self._render_table()
+        self._update_all_selection_cells()
 
     def action_confirm(self) -> None:
         self.dismiss(sorted(self._selected))
