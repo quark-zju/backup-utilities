@@ -12,6 +12,7 @@ import traceback
 from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.coordinate import Coordinate
 from textual.containers import Vertical
 from textual.widgets import DataTable, Footer, Header, Input, Static
 
@@ -27,7 +28,7 @@ from ..passphrase import (
 from ..protocols import default_registry
 from ..runner import run_backup
 from ..selectors import select_add, select_decrypt, select_encrypt, select_remove
-from ..units import UnitRow, collect_unit_rows
+from ..units import collect_unit_rows
 from .screens import (
     ConfirmScreen,
     DiscoverCandidate,
@@ -395,7 +396,16 @@ class BackupTextualApp(App[None]):
         if not unit_id:
             return
         self._state.toggle_selected(unit_id)
-        self._render_table(preferred_unit_id=unit_id)
+        self._update_selection_cell(unit_id)
+        self._render_status()
+
+    def _update_selection_cell(self, unit_id: str) -> None:
+        if unit_id not in self._state.visible_ids:
+            return
+        row_index = self._state.visible_ids.index(unit_id)
+        marker = "x" if unit_id in self._state.selected_ids else ""
+        table = self.query_one("#units_table", DataTable)
+        table.update_cell_at(Coordinate(row_index, 0), marker)
 
     def action_select_visible(self) -> None:
         keep_id = self._state.focused_id or self._current_unit_id()
