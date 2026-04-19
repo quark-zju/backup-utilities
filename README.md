@@ -38,5 +38,5 @@ https://developers.google.com/workspace/drive/api/quickstart/python#set-up-envir
 
 ## 文档
 
-- 详细命令与环境变量：`docs/quick-reference.md`
-- 技术细节与行为说明：`docs/technical-notes.md`
+- 详细命令与环境变量：[docs/quick-reference.md](docs/quick-reference.md)
+- 技术细节与行为说明：[docs/technical-notes.md](docs/technical-notes.md)
