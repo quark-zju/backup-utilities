@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .config import load_config, write_config
+from .recovery import set_unit_payload_encryption
 
 
 def select_add(root: Path, unit_id: str) -> None:
@@ -51,27 +52,19 @@ def select_unexclude(root: Path, unit_id: str) -> None:
     write_config(root, cfg)
 
 
-def select_encrypt(root: Path, unit_id: str) -> None:
+def select_encrypt(root: Path, unit_id: str, *, passphrase: str | None = None) -> str:
     cfg = load_config(root)
-
-    if unit_id not in cfg.unit_encrypt:
-        cfg.unit_encrypt.append(unit_id)
     if unit_id in cfg.unit_decrypt:
         cfg.unit_decrypt.remove(unit_id)
+        cfg.unit_decrypt.sort()
+        write_config(root, cfg)
+    return set_unit_payload_encryption(root, unit_id, True, passphrase=passphrase)
 
-    cfg.unit_encrypt.sort()
-    cfg.unit_decrypt.sort()
-    write_config(root, cfg)
 
-
-def select_decrypt(root: Path, unit_id: str) -> None:
+def select_decrypt(root: Path, unit_id: str, *, passphrase: str | None = None) -> str:
     cfg = load_config(root)
-
-    if unit_id not in cfg.unit_decrypt:
-        cfg.unit_decrypt.append(unit_id)
     if unit_id in cfg.unit_encrypt:
         cfg.unit_encrypt.remove(unit_id)
-
-    cfg.unit_encrypt.sort()
-    cfg.unit_decrypt.sort()
-    write_config(root, cfg)
+        cfg.unit_encrypt.sort()
+        write_config(root, cfg)
+    return set_unit_payload_encryption(root, unit_id, False, passphrase=passphrase)

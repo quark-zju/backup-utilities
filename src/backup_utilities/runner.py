@@ -37,7 +37,16 @@ def _should_encrypt(
     cfg: Config,
     protocol,
     protocol_metadata: dict[str, object],
+    prev_meta: dict[str, object] | None,
 ) -> bool:
+    if prev_meta is not None:
+        payload_raw = prev_meta.get("payload")
+        if isinstance(payload_raw, dict) and isinstance(
+            payload_raw.get("encrypted"), bool
+        ):
+            return bool(payload_raw["encrypted"])
+
+    # Legacy config fallback: only for units without known payload state.
     if unit_id in cfg.unit_encrypt:
         return True
     if unit_id in cfg.unit_decrypt:
@@ -127,6 +136,7 @@ def run_backup(
                     cfg=cfg,
                     protocol=protocol,
                     protocol_metadata=fingerprint.protocol_metadata,
+                    prev_meta=prev,
                 )
                 append_log(
                     root, "runner", f"payload encrypt unit={unit_id} value={encrypt}"

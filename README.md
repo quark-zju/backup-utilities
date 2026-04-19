@@ -77,6 +77,7 @@ uv run backup select unexclude github/owner/repo
 ### 3. 配置单元加密策略
 
 ```bash
+# 对已有快照立即转为加密/解密（会直接改 payload 与 metadata）
 uv run backup select encrypt github/owner/repo
 uv run backup select decrypt github/owner/repo
 ```
@@ -117,8 +118,8 @@ Space  切换当前行选中
 a      全选当前可见项
 n      全不选当前可见项
 b      对选中项串行执行 backup
-e      对选中项执行 force encrypt（已是 encrypt 跳过）
-d      对选中项执行 force decrypt（已是 decrypt 跳过）
+e      对选中项执行立即加密（已加密跳过）
+d      对选中项执行立即解密（已解密跳过）
 v      对选中项执行 toggle exclude（已 exclude 则取消）
 p      对选中项验证当前口令（不解密落盘）
 x      从 selected 中移除（带确认）

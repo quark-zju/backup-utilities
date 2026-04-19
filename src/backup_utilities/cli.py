@@ -64,8 +64,8 @@ def _cmd_status(args: argparse.Namespace) -> int:
     print(f"root: {root}")
     print(f"selected units: {len(cfg.unit_include)}")
     print(f"excluded units: {len(cfg.unit_exclude)}")
-    print(f"forced encrypt units: {len(cfg.unit_encrypt)}")
-    print(f"forced decrypt units: {len(cfg.unit_decrypt)}")
+    print(f"legacy force-encrypt entries: {len(cfg.unit_encrypt)}")
+    print(f"legacy force-decrypt entries: {len(cfg.unit_decrypt)}")
     print(f"indexed snapshots: {len(index)}")
     return 0
 
@@ -114,15 +114,15 @@ def _cmd_select_unexclude(args: argparse.Namespace) -> int:
 
 def _cmd_select_encrypt(args: argparse.Namespace) -> int:
     root = _resolve_root(args)
-    select_encrypt(root, args.unit_id)
-    print(f"force encrypt: {args.unit_id}")
+    result = select_encrypt(root, args.unit_id)
+    print(f"encrypt: {args.unit_id}: {result}")
     return 0
 
 
 def _cmd_select_decrypt(args: argparse.Namespace) -> int:
     root = _resolve_root(args)
-    select_decrypt(root, args.unit_id)
-    print(f"force decrypt: {args.unit_id}")
+    result = select_decrypt(root, args.unit_id)
+    print(f"decrypt: {args.unit_id}: {result}")
     return 0
 
 

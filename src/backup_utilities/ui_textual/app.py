@@ -553,23 +553,18 @@ class BackupTextualApp(App[None]):
     def _selected_need_passphrase(self, selected: list[str]) -> bool:
         cfg = load_config(self._root)
         for unit_id in selected:
-            if unit_id in cfg.unit_decrypt:
-                continue
-            if unit_id in cfg.unit_encrypt:
-                return True
-
-            # default_encrypt applies only when unit is not forced-decrypt.
-            if cfg.default_encrypt:
-                return True
-
             row = self._state.all_rows.get(unit_id)
             if row is None:
                 continue
-            # encrypt_policy may include display suffix like "(encrypted)".
-            if row.encrypt_policy.startswith("forced-decrypt"):
-                continue
-            if row.encrypt_policy.startswith("forced-encrypt"):
+            if row.encrypt_policy == "encrypted":
                 return True
+            if row.encrypt_policy == "auto(initial)":
+                if unit_id.startswith("gdrive/"):
+                    return True
+                if cfg.default_encrypt:
+                    return True
+                if unit_id.startswith("github/") and cfg.github_default_private_encrypt:
+                    return True
         return False
 
     def action_backup_selected(self) -> None:
@@ -611,46 +606,126 @@ class BackupTextualApp(App[None]):
         self._render_status(f"backup queued={queued_now} skipped={skipped}")
 
     def action_encrypt_selected(self) -> None:
+        self.run_worker(self._encrypt_selected_flow(), thread=False, exclusive=True)
+
+    async def _encrypt_selected_flow(self) -> None:
         selected = self._operation_target_ids()
         if not selected:
             self._render_status("no selected/focused units")
             return
 
-        cfg = load_config(self._root)
-        applied = 0
-        skipped = 0
+        passphrase: str | None = None
+        need_passphrase = False
         for unit_id in selected:
-            if unit_id in cfg.unit_encrypt:
-                skipped += 1
+            row = self._state.all_rows.get(unit_id)
+            if row is not None and row.encrypt_policy != "encrypted":
+                need_passphrase = True
+                break
+        if need_passphrase:
+            try:
+                passphrase = get_passphrase(allow_prompt=False)
+            except Exception:
+                entered = await self._prompt_new_passphrase_with_confirmation(
+                    title="Encrypt Payload",
+                    first_prompt="Passphrase required to encrypt payload:",
+                )
+                if entered is None:
+                    self._render_status("encrypt cancelled: passphrase not provided")
+                    return
+                set_cached_passphrase(entered)
+                passphrase = entered
+
+        updated = 0
+        unchanged = 0
+        missing = 0
+        failed = 0
+        for unit_id in selected:
+            try:
+                result = select_encrypt(self._root, unit_id, passphrase=passphrase)
+            except Exception:
+                failed += 1
                 continue
-            select_encrypt(self._root, unit_id)
-            applied += 1
-            cfg = load_config(self._root)
+            if result == "updated":
+                updated += 1
+            elif result == "unchanged":
+                unchanged += 1
+            elif result == "missing":
+                missing += 1
+            else:
+                failed += 1
         self._state.selected_ids.clear()
         self.action_reload_units()
-        self._render_status(f"encrypt applied={applied} skipped={skipped}")
-        self._log(f"encrypt applied={applied} skipped={skipped}")
+        self._render_status(
+            f"encrypt updated={updated} unchanged={unchanged} missing={missing} failed={failed}"
+        )
+        self._log(
+            f"encrypt updated={updated} unchanged={unchanged} missing={missing} failed={failed}"
+        )
 
     def action_decrypt_selected(self) -> None:
+        self.run_worker(self._decrypt_selected_flow(), thread=False, exclusive=True)
+
+    async def _decrypt_selected_flow(self) -> None:
         selected = self._operation_target_ids()
         if not selected:
             self._render_status("no selected/focused units")
             return
 
-        cfg = load_config(self._root)
-        applied = 0
-        skipped = 0
+        passphrase: str | None = None
+        need_passphrase = False
         for unit_id in selected:
-            if unit_id in cfg.unit_decrypt:
-                skipped += 1
+            row = self._state.all_rows.get(unit_id)
+            if row is not None and row.encrypt_policy == "encrypted":
+                need_passphrase = True
+                break
+        if need_passphrase:
+            try:
+                passphrase = get_passphrase(allow_prompt=False)
+            except Exception:
+                entered = await self.push_screen_wait(
+                    TextPromptScreen(
+                        "Decrypt Payload",
+                        "Passphrase required to decrypt payload:",
+                        "",
+                        password=True,
+                    )
+                )
+                if entered is None:
+                    self._render_status("decrypt cancelled: passphrase not provided")
+                    return
+                entered = entered.strip()
+                if not entered:
+                    self._render_status("decrypt cancelled: empty passphrase")
+                    return
+                set_cached_passphrase(entered)
+                passphrase = entered
+
+        updated = 0
+        unchanged = 0
+        missing = 0
+        failed = 0
+        for unit_id in selected:
+            try:
+                result = select_decrypt(self._root, unit_id, passphrase=passphrase)
+            except Exception:
+                failed += 1
                 continue
-            select_decrypt(self._root, unit_id)
-            applied += 1
-            cfg = load_config(self._root)
+            if result == "updated":
+                updated += 1
+            elif result == "unchanged":
+                unchanged += 1
+            elif result == "missing":
+                missing += 1
+            else:
+                failed += 1
         self._state.selected_ids.clear()
         self.action_reload_units()
-        self._render_status(f"decrypt applied={applied} skipped={skipped}")
-        self._log(f"decrypt applied={applied} skipped={skipped}")
+        self._render_status(
+            f"decrypt updated={updated} unchanged={unchanged} missing={missing} failed={failed}"
+        )
+        self._log(
+            f"decrypt updated={updated} unchanged={unchanged} missing={missing} failed={failed}"
+        )
 
     def action_check_passphrase_selected(self) -> None:
         selected = self._operation_target_ids()

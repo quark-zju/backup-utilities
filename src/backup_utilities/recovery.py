@@ -5,8 +5,16 @@ from pathlib import Path
 from cryptography.exceptions import InvalidTag
 
 from .crypto import decrypt_file, verify_passphrase_for_file
+from .archive import sha256_file
+from .crypto import encrypt_file
 from .passphrase import clear_cached_passphrase, get_passphrase, prompt_new_passphrase
-from .storage import metadata_path, read_json
+from .storage import (
+    encrypted_payload_path,
+    metadata_path,
+    payload_path,
+    read_json,
+    write_json_atomic,
+)
 
 
 def decrypt_unit_payload(root: Path, unit_id: str, out: Path) -> int:
@@ -97,3 +105,93 @@ def verify_unit_passphrase(root: Path, unit_id: str, passphrase: str) -> str:
     except Exception:
         return "error"
     return "ok"
+
+
+def set_unit_payload_encryption(
+    root: Path,
+    unit_id: str,
+    encrypt: bool,
+    *,
+    passphrase: str | None = None,
+) -> str:
+    """Set payload encryption state in-place for one unit.
+
+    Returns:
+    - "updated": payload rewritten and metadata updated.
+    - "unchanged": payload already in target state.
+    - "missing": metadata/payload unavailable.
+    """
+    meta_path = metadata_path(root, unit_id)
+    if not meta_path.exists():
+        return "missing"
+
+    meta = read_json(meta_path)
+    payload_info = meta.get("payload", {})
+    if not isinstance(payload_info, dict):
+        return "missing"
+
+    current_encrypted = bool(payload_info.get("encrypted", False))
+    payload_rel = str(payload_info.get("path", ""))
+    if not payload_rel:
+        return "missing"
+    current_payload = root / payload_rel
+    if not current_payload.exists():
+        return "missing"
+
+    if current_encrypted == encrypt:
+        return "unchanged"
+
+    snapshot_time = str(meta.get("snapshot_time", ""))
+    if encrypt:
+        secret = passphrase or get_passphrase(confirm_new=True)
+        final_payload = encrypted_payload_path(root, unit_id)
+        tmp_payload = final_payload.with_name(f"{final_payload.name}.tmp")
+        enc = encrypt_file(
+            input_path=current_payload,
+            output_path=tmp_payload,
+            passphrase=secret,
+            aad_context={
+                "unit_id": unit_id,
+                "snapshot_time": snapshot_time,
+                "payload_name": final_payload.name,
+            },
+        )
+        tmp_payload.replace(final_payload)
+        payload_path(root, unit_id).unlink(missing_ok=True)
+        meta["payload"] = {
+            **payload_info,
+            "path": str(final_payload.relative_to(root)),
+            "size_bytes": enc.size_bytes,
+            "sha256": enc.sha256_hex,
+            "encrypted": True,
+        }
+        meta["encryption"] = enc.encryption_metadata
+    else:
+        secret = passphrase or get_passphrase()
+        final_payload = payload_path(root, unit_id)
+        tmp_payload = final_payload.with_name(f"{final_payload.name}.tmp")
+        decrypt_file(
+            input_path=current_payload,
+            output_path=tmp_payload,
+            passphrase=secret,
+            aad_context={
+                "unit_id": unit_id,
+                "snapshot_time": snapshot_time,
+                "payload_name": Path(payload_rel).name,
+            },
+        )
+        digest = sha256_file(tmp_payload)
+        size_bytes = tmp_payload.stat().st_size
+        tmp_payload.replace(final_payload)
+        encrypted_payload_path(root, unit_id).unlink(missing_ok=True)
+        meta["payload"] = {
+            **payload_info,
+            "path": str(final_payload.relative_to(root)),
+            "size_bytes": size_bytes,
+            "sha256": digest,
+            "encrypted": False,
+        }
+        meta.pop("encryption", None)
+
+    write_json_atomic(meta_path, meta)
+    return "updated"

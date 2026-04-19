@@ -50,17 +50,10 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
             meta.get("protocol_metadata", {}) if isinstance(meta, dict) else {}
         )
 
-        if unit_id in cfg.unit_encrypt:
-            policy = "forced-encrypt"
-        elif unit_id in cfg.unit_decrypt:
-            policy = "forced-decrypt"
+        if isinstance(payload, dict) and isinstance(payload.get("encrypted"), bool):
+            policy_display = "encrypted" if bool(payload.get("encrypted")) else "plain"
         else:
-            policy = "auto"
-
-        policy_display = policy
-        if isinstance(payload, dict) and payload.get("encrypted") is not None:
-            encrypted = bool(payload.get("encrypted"))
-            policy_display = f"{policy} ({'encrypted' if encrypted else 'plain'})"
+            policy_display = "auto(initial)"
 
         unit_label = unit_id
         if unit_id.startswith("gdrive/folder/") and isinstance(protocol_meta, dict):
