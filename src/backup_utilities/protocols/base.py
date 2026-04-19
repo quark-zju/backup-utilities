@@ -3,10 +3,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..config import Config
+
+ProtocolLogger = Callable[[str], None]
 
 
 @dataclass(slots=True)
@@ -49,6 +51,7 @@ class BackupProtocol(ABC):
         unit_id: str,
         staging_dir: Path,
         previous_snapshot_dir: Path | None = None,
+        logger: ProtocolLogger | None = None,
     ) -> ExportResult:
         raise NotImplementedError
 

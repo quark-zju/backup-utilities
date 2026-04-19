@@ -209,6 +209,7 @@ class GoogleDriveProtocol(BackupProtocol):
         unit_id: str,
         staging_dir: Path,
         previous_snapshot_dir: Path | None = None,
+        logger=None,
     ) -> ExportResult:
         folder_id = self._parse_unit_id(unit_id)
         service = _build_drive_service()

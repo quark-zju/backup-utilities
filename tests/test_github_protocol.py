@@ -15,7 +15,7 @@ def test_export_snapshot_clones_when_no_previous_snapshot(
         recorded.append(cmd)
         return ""
 
-    def fail_run_git(workdir: Path, cmd: list[str]) -> str:
+    def fail_run_git(workdir: Path, cmd: list[str], logger=None) -> str:
         raise AssertionError("git commands should not run without previous snapshot")
 
     monkeypatch.setattr("backup_utilities.protocols.github._run", fake_run)
@@ -47,12 +47,15 @@ def test_export_snapshot_fetches_and_repacks_restored_mirror(
     (restored_repo / "config").write_text("[core]\n", encoding="utf-8")
 
     git_calls: list[tuple[Path, list[str]]] = []
+    logged_messages: list[str] = []
 
     def fail_clone(cmd: list[str]) -> str:
         raise AssertionError(f"clone should not run: {cmd}")
 
-    def fake_run_git(workdir: Path, cmd: list[str]) -> str:
+    def fake_run_git(workdir: Path, cmd: list[str], logger=None) -> str:
         git_calls.append((workdir, cmd))
+        if logger is not None:
+            logger(f"exec cwd={workdir} cmd={' '.join(cmd)}")
         return ""
 
     monkeypatch.setattr("backup_utilities.protocols.github._run", fail_clone)
@@ -62,6 +65,7 @@ def test_export_snapshot_fetches_and_repacks_restored_mirror(
         "github/quark/demo",
         tmp_path,
         previous_snapshot_dir=previous_snapshot_dir,
+        logger=logged_messages.append,
     )
 
     clone_target = tmp_path / "demo.git"
@@ -77,4 +81,8 @@ def test_export_snapshot_fetches_and_repacks_restored_mirror(
             clone_target,
             ["git", "repack", "-a", "-d", "--write-bitmap-index"],
         ),
+    ]
+    assert logged_messages == [
+        f"exec cwd={clone_target} cmd=git fetch --prune --tags origin +refs/*:refs/*",
+        f"exec cwd={clone_target} cmd=git repack -a -d --write-bitmap-index",
     ]

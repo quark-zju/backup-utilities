@@ -130,6 +130,9 @@ def run_backup(
                     unit_id,
                     staging,
                     previous_snapshot_dir=previous_snapshot_dir,
+                    logger=lambda message, source=protocol.name: append_log(
+                        root, source, message
+                    ),
                 )
                 target_dir = unit_dir(root, unit_id)
                 target_dir.mkdir(parents=True, exist_ok=True)

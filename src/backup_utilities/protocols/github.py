@@ -9,7 +9,13 @@ import re
 import subprocess
 from typing import TYPE_CHECKING
 
-from .base import BackupProtocol, DiscoveredUnit, ExportResult, FingerprintResult
+from .base import (
+    BackupProtocol,
+    DiscoveredUnit,
+    ExportResult,
+    FingerprintResult,
+    ProtocolLogger,
+)
 
 if TYPE_CHECKING:
     from ..config import Config
@@ -174,6 +180,7 @@ class GithubProtocol(BackupProtocol):
         unit_id: str,
         staging_dir: Path,
         previous_snapshot_dir: Path | None = None,
+        logger: ProtocolLogger | None = None,
     ) -> ExportResult:
         ident = self._parse_unit_id(unit_id)
         clone_target = staging_dir / f"{ident.repo}.git"
@@ -196,10 +203,12 @@ class GithubProtocol(BackupProtocol):
             self._run_git(
                 clone_target,
                 ["git", "fetch", "--prune", "--tags", "origin", "+refs/*:refs/*"],
+                logger=logger,
             )
             self._run_git(
                 clone_target,
                 ["git", "repack", "-a", "-d", "--write-bitmap-index"],
+                logger=logger,
             )
         return ExportResult(source_path=clone_target)
 
@@ -220,7 +229,13 @@ class GithubProtocol(BackupProtocol):
         return repo_dir
 
     @staticmethod
-    def _run_git(workdir: Path, cmd: list[str]) -> str:
+    def _run_git(
+        workdir: Path,
+        cmd: list[str],
+        logger: ProtocolLogger | None = None,
+    ) -> str:
+        if logger is not None:
+            logger(f"exec cwd={workdir} cmd={' '.join(cmd)}")
         res = subprocess.run(
             cmd,
             check=False,
