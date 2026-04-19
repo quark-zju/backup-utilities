@@ -118,6 +118,8 @@ ctime:>=2026-04-01
 mtime:>=2026-01-01 ctime:<2026-06-01
 ```
 
+说明：TUI 列表中的 `Last Snapshot Time` 仅显示 `Y-m-d` 日期，不显示具体时分秒。
+
 ## 依赖说明
 
 - GitHub 协议依赖：`gh` CLI（需先 `gh auth login`）

@@ -4,7 +4,9 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 import os
 from pathlib import Path
+import queue
 import sys
+import threading
 import traceback
 
 from textual import events
@@ -48,6 +50,13 @@ def _fmt_ts(value: str | None) -> str:
     return value
 
 
+def _fmt_snapshot_date(value: str | None) -> str:
+    if not value:
+        return "-"
+    # ISO-like value, keep only Y-m-d for snapshot column readability.
+    return value.split("T", maxsplit=1)[0]
+
+
 class BackupTextualApp(App[None]):
     CSS = """
     #topbar {
@@ -82,6 +91,15 @@ class BackupTextualApp(App[None]):
         self._root = root
         self._protocol_registry = default_registry()
         self._state = UnitListState()
+        self._backup_queue: queue.Queue[str | None] = queue.Queue()
+        self._backup_events: queue.Queue[tuple[str, str, bool | None]] = queue.Queue()
+        self._backup_status: dict[str, str] = {}
+        self._backup_worker_stop = threading.Event()
+        self._backup_worker = threading.Thread(
+            target=self._backup_worker_main,
+            name="backup-worker",
+            daemon=True,
+        )
 
     def _fatal_error(self) -> None:
         if os.environ.get("BACKUP_PLAIN_TRACEBACK") == "1":
@@ -121,7 +139,13 @@ class BackupTextualApp(App[None]):
             "Payload Size",
             "Last Verify Time",
         )
+        self.set_interval(0.2, self._drain_backup_events)
+        self._backup_worker.start()
         self.action_reload_units()
+
+    def on_unmount(self) -> None:
+        self._backup_worker_stop.set()
+        self._backup_queue.put(None)
 
     def _capture_call(self, fn, *args, **kwargs):
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
@@ -137,11 +161,17 @@ class BackupTextualApp(App[None]):
         for unit_id in self._state.visible_ids:
             row = self._state.all_rows[unit_id]
             marker = "x" if unit_id in self._state.selected_ids else ""
+            runtime_status = self._backup_status.get(unit_id)
+            unit_label = row.unit_id
+            if runtime_status == "queued":
+                unit_label = f"{unit_label} (queued)"
+            elif runtime_status == "backing_up":
+                unit_label = f"{unit_label} (backing up)"
             table.add_row(
                 marker,
-                row.unit_id,
+                unit_label,
                 row.encrypt_policy,
-                _fmt_ts(row.last_snapshot_time),
+                _fmt_snapshot_date(row.last_snapshot_time),
                 _fmt_size(row.payload_size_bytes),
                 _fmt_ts(row.last_verify_time),
             )
@@ -154,15 +184,59 @@ class BackupTextualApp(App[None]):
         visible = len(self._state.visible_ids)
         selected = len(self._state.selected_ids)
         hidden = self._state.selected_hidden_count
+        queued = len([x for x in self._backup_status.values() if x == "queued"])
+        backing_up = len([x for x in self._backup_status.values() if x == "backing_up"])
 
         chunks = [
-            f"total={total} visible={visible} selected={selected} hidden_selected={hidden}"
+            (
+                f"total={total} visible={visible} selected={selected} "
+                f"hidden_selected={hidden} queued={queued} backing_up={backing_up}"
+            )
         ]
         if self._state.query_error:
             chunks.append(f"query_error={self._state.query_error}")
         if message:
             chunks.append(message)
         status.update(" | ".join(chunks))
+
+    def _backup_worker_main(self) -> None:
+        while not self._backup_worker_stop.is_set():
+            unit_id = self._backup_queue.get()
+            if unit_id is None:
+                break
+            self._backup_events.put(("start", unit_id, None))
+            code = self._capture_call(
+                run_backup,
+                self._root,
+                self._protocol_registry,
+                unit_id,
+                False,
+            )
+            self._backup_events.put(("done", unit_id, code == 0))
+
+    def _drain_backup_events(self) -> None:
+        updated = False
+        message: str | None = None
+        while True:
+            try:
+                phase, unit_id, ok = self._backup_events.get_nowait()
+            except queue.Empty:
+                break
+
+            updated = True
+            if phase == "start":
+                self._backup_status[unit_id] = "backing_up"
+                message = f"backing up: {unit_id}"
+            elif phase == "done":
+                self._backup_status.pop(unit_id, None)
+                if ok:
+                    message = f"backup done: {unit_id}"
+                else:
+                    message = f"backup failed: {unit_id}"
+
+        if updated:
+            self.action_reload_units()
+            self._render_status(message)
 
     def _current_unit_id(self) -> str | None:
         table = self.query_one("#units_table", DataTable)
@@ -257,22 +331,19 @@ class BackupTextualApp(App[None]):
         if not selected:
             self._render_status("no selected units")
             return
-        success = 0
-        failed = 0
+
+        queued_now = 0
+        skipped = 0
         for unit_id in selected:
-            code = self._capture_call(
-                run_backup,
-                self._root,
-                self._protocol_registry,
-                unit_id,
-                False,
-            )
-            if code == 0:
-                success += 1
-            else:
-                failed += 1
-        self.action_reload_units()
-        self._render_status(f"backup done: success={success} failed={failed}")
+            current = self._backup_status.get(unit_id)
+            if current in {"queued", "backing_up"}:
+                skipped += 1
+                continue
+            self._backup_status[unit_id] = "queued"
+            self._backup_queue.put(unit_id)
+            queued_now += 1
+        self._render_table()
+        self._render_status(f"backup queued={queued_now} skipped={skipped}")
 
     def action_encrypt_selected(self) -> None:
         selected = self._selected_ids()
