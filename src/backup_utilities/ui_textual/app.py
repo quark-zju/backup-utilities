@@ -76,7 +76,7 @@ class BackupTextualApp(App[None]):
     def __init__(self, root: Path) -> None:
         super().__init__()
         self._root = root
-        self._registry = default_registry()
+        self._protocol_registry = default_registry()
         self._state = UnitListState()
 
     def compose(self) -> ComposeResult:
@@ -192,7 +192,7 @@ class BackupTextualApp(App[None]):
             code = self._capture_call(
                 run_backup,
                 self._root,
-                self._registry,
+                self._protocol_registry,
                 unit_id,
                 False,
             )
@@ -308,7 +308,7 @@ class BackupTextualApp(App[None]):
         try:
             discovered = self._capture_call(
                 discover_units,
-                self._registry,
+                self._protocol_registry,
                 protocol,
                 user=user.strip() or None,
                 limit=limit,
