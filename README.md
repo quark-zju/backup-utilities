@@ -15,7 +15,7 @@
 gh auth login
 
 # 启动 TUI
-uv run backup tui
+uv run tui
 
 # 按 f 列举可备份 repo，选择后按 Enter 确认
 # 按 b 开始备份，私有 repo 默认使用密码加密
