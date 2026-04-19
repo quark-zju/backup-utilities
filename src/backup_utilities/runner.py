@@ -184,19 +184,37 @@ def verify_units(root: Path, unit: str | None) -> int:
             continue
 
         meta = read_json(meta_path)
+        check_time = now_utc()
         payload_rel = meta["payload"]["path"]
         payload = root / str(payload_rel)
         if not payload.exists():
             print(f"missing payload: {unit_id}")
+            meta["verify"] = {
+                "last_check_time": check_time,
+                "ok": False,
+                "reason": "missing payload",
+            }
+            write_json_atomic(meta_path, meta)
             failed += 1
             continue
         expected = str(meta["payload"]["sha256"])
         current = sha256_file(payload)
         if expected == current:
             print(f"ok: {unit_id}")
+            meta["verify"] = {
+                "last_check_time": check_time,
+                "ok": True,
+            }
+            write_json_atomic(meta_path, meta)
             ok += 1
         else:
             print(f"mismatch: {unit_id}")
+            meta["verify"] = {
+                "last_check_time": check_time,
+                "ok": False,
+                "reason": "sha256 mismatch",
+            }
+            write_json_atomic(meta_path, meta)
             failed += 1
 
     print(f"verify done. ok={ok} failed={failed}")
