@@ -66,7 +66,23 @@ def _prompt_in_cli(prompt: str) -> str:
     return value
 
 
-def prompt_new_passphrase(prompt: str = "Backup passphrase: ") -> str:
+def validate_new_passphrase(
+    value: str,
+    confirmation: str | None = None,
+    *,
+    require_confirmation: bool = False,
+) -> str:
+    if not value:
+        raise ValueError("empty passphrase")
+    if require_confirmation:
+        if confirmation is None:
+            raise ValueError("passphrase confirmation is required")
+        if value != confirmation:
+            raise ValueError("passphrase confirmation mismatch")
+    return value
+
+
+def _prompt_once(prompt: str) -> str:
     with _lock:
         func = _prompt_func
 
@@ -74,17 +90,33 @@ def prompt_new_passphrase(prompt: str = "Backup passphrase: ") -> str:
         value = func(prompt)
         if value is None:
             raise ValueError("passphrase input cancelled")
-        if not value:
-            raise ValueError("empty passphrase")
-    else:
-        value = _prompt_in_cli(prompt)
+        return value
 
-    set_cached_passphrase(value)
-    return value
+    return _prompt_in_cli(prompt)
+
+
+def prompt_new_passphrase(
+    prompt: str = "Backup passphrase: ",
+    *,
+    confirm: bool = False,
+    confirm_prompt: str = "Confirm passphrase: ",
+) -> str:
+    value = _prompt_once(prompt)
+    confirmation = _prompt_once(confirm_prompt) if confirm else None
+    out = validate_new_passphrase(
+        value,
+        confirmation,
+        require_confirmation=confirm,
+    )
+    set_cached_passphrase(out)
+    return out
 
 
 def get_passphrase(
-    *, allow_prompt: bool = True, prompt: str = "Backup passphrase: "
+    *,
+    allow_prompt: bool = True,
+    prompt: str = "Backup passphrase: ",
+    confirm_new: bool = False,
 ) -> str:
     initialize_from_env()
     with _lock:
@@ -100,4 +132,4 @@ def get_passphrase(
     if not allow_prompt:
         raise ValueError("passphrase unavailable")
 
-    return prompt_new_passphrase(prompt)
+    return prompt_new_passphrase(prompt, confirm=confirm_new)

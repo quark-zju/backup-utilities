@@ -112,7 +112,7 @@ def run_backup(
                     enc = encrypt_file(
                         input_path=archive_tmp,
                         output_path=encrypted_tmp,
-                        passphrase=get_passphrase(),
+                        passphrase=get_passphrase(confirm_new=True),
                         aad_context={
                             "unit_id": unit_id,
                             "snapshot_time": snapshot_time,

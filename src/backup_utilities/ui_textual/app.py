@@ -24,6 +24,7 @@ from ..passphrase import (
     get_passphrase,
     has_passphrase_cached,
     set_cached_passphrase,
+    validate_new_passphrase,
 )
 from ..protocols import default_registry
 from ..runner import run_backup
@@ -368,24 +369,42 @@ class BackupTextualApp(App[None]):
             self._log("passphrase cache cleared")
             return
 
-        entered = await self.push_screen_wait(
-            TextPromptScreen(
-                "Passphrase",
-                "Enter passphrase to cache in memory:",
-                "",
-                password=True,
-            )
+        entered = await self._prompt_new_passphrase_with_confirmation(
+            title="Passphrase",
+            first_prompt="Enter passphrase to cache in memory:",
         )
         if entered is None:
             self._render_status("passphrase unchanged")
             return
-        entered = entered.strip()
-        if not entered:
-            self._render_status("empty passphrase ignored")
-            return
         set_cached_passphrase(entered)
         self._render_status("passphrase cached")
         self._log("passphrase cached")
+
+    async def _prompt_new_passphrase_with_confirmation(
+        self,
+        *,
+        title: str,
+        first_prompt: str,
+    ) -> str | None:
+        first = await self.push_screen_wait(
+            TextPromptScreen(title, first_prompt, "", password=True)
+        )
+        if first is None:
+            return None
+        second = await self.push_screen_wait(
+            TextPromptScreen(title, "Confirm passphrase:", "", password=True)
+        )
+        if second is None:
+            return None
+        try:
+            return validate_new_passphrase(
+                first.strip(),
+                second.strip(),
+                require_confirmation=True,
+            )
+        except ValueError as exc:
+            self._render_status(str(exc))
+            return None
 
     def on_key(self, event: events.Key) -> None:
         search = self.query_one("#search", Input)
@@ -465,20 +484,12 @@ class BackupTextualApp(App[None]):
                 # Use env or cached value if already available.
                 get_passphrase(allow_prompt=False)
             except Exception:
-                entered = await self.push_screen_wait(
-                    TextPromptScreen(
-                        "Backup Passphrase",
-                        "Passphrase required for encrypted backup:",
-                        "",
-                        password=True,
-                    )
+                entered = await self._prompt_new_passphrase_with_confirmation(
+                    title="Backup Passphrase",
+                    first_prompt="Passphrase required for encrypted backup:",
                 )
                 if entered is None:
                     self._render_status("backup cancelled: passphrase not provided")
-                    return
-                entered = entered.strip()
-                if not entered:
-                    self._render_status("backup cancelled: empty passphrase")
                     return
                 set_cached_passphrase(entered)
 
