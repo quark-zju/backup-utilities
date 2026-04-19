@@ -89,6 +89,7 @@ class BackupTextualApp(App[None]):
 
     BINDINGS = [
         Binding("/", "focus_search", "Search"),
+        Binding("question_mark", "show_help_panel", "Keys"),
         Binding("tab", "toggle_focus", "Focus"),
         Binding("ctrl+e", "manage_passphrase", "Passphrase"),
         Binding("space", "toggle_row", "Toggle"),

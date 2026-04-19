@@ -94,6 +94,7 @@ uv run backup tui
 
 ```text
 /      聚焦搜索框（默认焦点在列表）
+?      打开 Textual Keys 帮助面板
 Tab    在搜索框与列表间切换焦点
 Esc    搜索框聚焦时切回列表
 Down   搜索框聚焦时切回列表
