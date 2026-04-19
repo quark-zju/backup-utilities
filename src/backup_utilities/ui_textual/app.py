@@ -22,6 +22,7 @@ from ..logging_utils import append_log
 from ..passphrase import (
     cache_confirmed_passphrase,
     clear_cached_passphrase,
+    clear_passphrase_for_configured_uuid,
     configure_keyring_uuid,
     get_passphrase,
     has_passphrase_cached,
@@ -450,8 +451,16 @@ class BackupTextualApp(App[None]):
     async def _manage_passphrase_flow(self) -> None:
         if has_passphrase_cached():
             clear_cached_passphrase()
-            self._render_status("passphrase cache cleared")
-            self._log("passphrase cache cleared")
+            keyring_status = clear_passphrase_for_configured_uuid()
+            if keyring_status == "cleared":
+                self._render_status("passphrase cache and keyring cleared")
+            elif keyring_status == "missing":
+                self._render_status("passphrase cache cleared; keyring already empty")
+            elif keyring_status == "failed":
+                self._render_status("passphrase cache cleared; keyring clear failed")
+            else:
+                self._render_status("passphrase cache cleared; keyring clear skipped")
+            self._log(f"passphrase cache cleared keyring={keyring_status}")
             return
 
         entered = await self.push_screen_wait(

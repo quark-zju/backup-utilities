@@ -12,6 +12,7 @@ from typing import Callable, Literal
 
 PromptFunc = Callable[[str], str | None]
 StoreStatus = Literal["stored", "failed", "skipped"]
+ClearStatus = Literal["cleared", "missing", "failed", "skipped"]
 
 _KEY_DIR = Path.home() / ".config" / "backup-utilities" / "keyring-keys"
 _KEYRING_SERVICE = "backup-utilities"
@@ -111,6 +112,23 @@ def store_passphrase_in_keyring(uuid: str, passphrase: str) -> None:
     _logger.info("keyring write success for uuid=%s", uuid)
 
 
+def clear_passphrase_from_keyring(uuid: str) -> bool:
+    uuid = _normalize_uuid(uuid)
+    import keyring
+
+    try:
+        keyring.delete_password(_KEYRING_SERVICE, uuid)
+        _logger.info("keyring clear success for uuid=%s", uuid)
+        return True
+    except Exception as exc:
+        err_cls = getattr(keyring, "errors", None)
+        delete_error = getattr(err_cls, "PasswordDeleteError", None)
+        if delete_error is not None and isinstance(exc, delete_error):
+            _logger.info("keyring clear miss for uuid=%s", uuid)
+            return False
+        raise
+
+
 def get_passphrase_from_keyring(uuid: str) -> str | None:
     uuid = _normalize_uuid(uuid)
     _logger.debug("attempt keyring read for uuid=%s", uuid)
@@ -162,6 +180,22 @@ def store_passphrase_for_configured_uuid(passphrase: str) -> StoreStatus:
         _logger.exception("keyring write failed for uuid=%s", uuid)
         return "failed"
     return "stored"
+
+
+def clear_passphrase_for_configured_uuid() -> ClearStatus:
+    uuid = _configured_keyring_uuid()
+    if not uuid:
+        _logger.debug("skip keyring clear: keyring uuid is not configured")
+        return "skipped"
+
+    try:
+        removed = clear_passphrase_from_keyring(uuid)
+    except Exception:
+        _logger.exception("keyring clear failed for uuid=%s", uuid)
+        return "failed"
+    if removed:
+        return "cleared"
+    return "missing"
 
 
 def cache_confirmed_passphrase(passphrase: str) -> StoreStatus:

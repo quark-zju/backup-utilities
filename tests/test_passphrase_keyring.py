@@ -150,3 +150,22 @@ def test_get_passphrase_falls_back_to_prompt_when_keyring_read_fails(
         assert result == "typed-secret"
     finally:
         _reset_passphrase_state()
+
+
+def test_clear_passphrase_for_configured_uuid_calls_keyring_delete(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_clear(uuid: str) -> bool:
+        calls.append(uuid)
+        return True
+
+    monkeypatch.setattr(passphrase, "clear_passphrase_from_keyring", fake_clear)
+    _reset_passphrase_state()
+    passphrase.configure_keyring_uuid(TEST_UUID)
+
+    try:
+        result = passphrase.clear_passphrase_for_configured_uuid()
+        assert result == "cleared"
+        assert calls == [TEST_UUID]
+    finally:
+        _reset_passphrase_state()
