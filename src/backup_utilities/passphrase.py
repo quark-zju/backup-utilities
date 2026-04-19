@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from base64 import b64decode, b64encode
 from getpass import getpass
 import os
+from pathlib import Path
 import sys
 import threading
 from typing import Callable
 
 PromptFunc = Callable[[str], str | None]
+
+_CONFIG_DIR = Path.home() / ".config" / "backup-utilities"
+_KEYRING_SERVICE = "backup-utilities"
 
 _lock = threading.Lock()
 _cached_passphrase: str | None = None
@@ -28,6 +33,55 @@ def initialize_from_env() -> None:
         value = os.environ.pop("BACKUP_PASSPHRASE", None)
         if value:
             _env_passphrase = value
+
+
+def _get_key_path(uuid: str) -> Path:
+    return _CONFIG_DIR / f"{uuid}.key"
+
+
+def _get_or_create_key(uuid: str) -> bytes:
+    key_path = _get_key_path(uuid)
+    if key_path.exists():
+        return key_path.read_bytes()
+    key = os.urandom(32)
+    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    key_path.write_bytes(key)
+    return key
+
+
+def _fernet_from_key(key: bytes):
+    from cryptography.fernet import Fernet
+
+    fernet_key = b64encode(key).decode("ascii")
+    return Fernet(fernet_key.encode())
+
+
+def _encrypt_passphrase(passphrase: str, key: bytes) -> str:
+    f = _fernet_from_key(key)
+    return b64encode(f.encrypt(passphrase.encode())).decode()
+
+
+def _decrypt_passphrase(encrypted: str, key: bytes) -> str:
+    f = _fernet_from_key(key)
+    return f.decrypt(b64decode(encrypted)).decode()
+
+
+def store_passphrase_in_keyring(uuid: str, passphrase: str) -> None:
+    key = _get_or_create_key(uuid)
+    encrypted = _encrypt_passphrase(passphrase, key)
+    import keyring
+
+    keyring.set_password(_KEYRING_SERVICE, uuid, encrypted)
+
+
+def get_passphrase_from_keyring(uuid: str) -> str | None:
+    import keyring
+
+    encrypted = keyring.get_password(_KEYRING_SERVICE, uuid)
+    if encrypted is None:
+        return None
+    key = _get_or_create_key(uuid)
+    return _decrypt_passphrase(encrypted, key)
 
 
 def set_prompt_func(func: PromptFunc | None) -> None:
