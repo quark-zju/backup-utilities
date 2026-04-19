@@ -270,11 +270,14 @@ class BackupTextualApp(App[None]):
         hidden = self._state.selected_hidden_count
         queued = len([x for x in self._backup_status.values() if x == "queued"])
         backing_up = len([x for x in self._backup_status.values() if x == "backing_up"])
+        passphrase_loaded = has_passphrase_cached()
+        passphrase_state = "loaded" if passphrase_loaded else "unloaded"
 
         chunks = [
             (
                 f"total={total} visible={visible} selected={selected} "
-                f"hidden_selected={hidden} queued={queued} backing_up={backing_up}"
+                f"hidden_selected={hidden} queued={queued} backing_up={backing_up} "
+                f"passphrase={passphrase_state}"
             )
         ]
         if self._state.query_error:
