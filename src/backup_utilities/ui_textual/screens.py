@@ -183,6 +183,11 @@ class DiscoverSelectScreen(Screen[list[str] | None]):
     def action_cancel(self) -> None:
         self.dismiss(None)
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.data_table.id != "discover_table":
+            return
+        self.action_confirm()
+
 
 class ProtocolSelectScreen(Screen[str | None]):
     CSS = """
