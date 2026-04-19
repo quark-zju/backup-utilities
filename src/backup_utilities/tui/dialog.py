@@ -58,6 +58,8 @@ class Whiptail:
         args = [
             "--title",
             title,
+            "--cancel-button",
+            "Back",
             "--menu",
             text,
             "22",
@@ -78,6 +80,8 @@ class Whiptail:
         args = [
             "--title",
             title,
+            "--cancel-button",
+            "Back",
             "--checklist",
             text,
             "24",
@@ -97,7 +101,17 @@ class Whiptail:
         return shlex.split(value)
 
     def inputbox(self, title: str, text: str, default: str = "") -> str | None:
-        args = ["--title", title, "--inputbox", text, "12", "90", default]
+        args = [
+            "--title",
+            title,
+            "--cancel-button",
+            "Back",
+            "--inputbox",
+            text,
+            "12",
+            "90",
+            default,
+        ]
         out = self._run(args)
         return out.value if out.code == 0 else None
 
