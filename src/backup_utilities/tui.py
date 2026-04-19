@@ -31,26 +31,29 @@ class Whiptail:
             raise RuntimeError("tui requires an interactive tty terminal")
 
     def _run(self, args: list[str]) -> DialogResult:
-        capture_fd = self._allocate_capture_fd()
+        read_fd, write_fd = os.pipe()
         try:
-            cmd = ["whiptail", "--output-fd", str(capture_fd), *args]
-            res = subprocess.run(cmd, check=False, pass_fds=(capture_fd,))
-            value = self._read_capture_fd(capture_fd)
+            cmd = ["whiptail", "--output-fd", str(write_fd), *args]
+            res = subprocess.run(
+                cmd,
+                check=False,
+                pass_fds=(write_fd,),
+                stdin=sys.stdin,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            os.close(write_fd)
+            value = self._read_capture_fd(read_fd)
             return DialogResult(code=res.returncode, value=value.strip())
         finally:
-            os.close(capture_fd)
-
-    @staticmethod
-    def _allocate_capture_fd() -> int:
-        if hasattr(os, "memfd_create"):
-            return os.memfd_create("backup-whiptail-output", flags=0)
-        fd, path = tempfile.mkstemp(prefix="backup-whiptail-output-")
-        os.unlink(path)
-        return fd
+            for fd in (read_fd, write_fd):
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
 
     @staticmethod
     def _read_capture_fd(fd: int) -> str:
-        os.lseek(fd, 0, os.SEEK_SET)
         chunks: list[bytes] = []
         while True:
             data = os.read(fd, 4096)
