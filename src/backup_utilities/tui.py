@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -30,10 +31,33 @@ class Whiptail:
             raise RuntimeError("tui requires an interactive tty terminal")
 
     def _run(self, args: list[str]) -> DialogResult:
-        # Keep whiptail UI on stderr (attached to terminal), capture result from stdout.
-        cmd = ["whiptail", "--output-fd", "1", *args]
-        res = subprocess.run(cmd, check=False, stdout=subprocess.PIPE, text=True)
-        return DialogResult(code=res.returncode, value=res.stdout.strip())
+        capture_fd = self._allocate_capture_fd()
+        try:
+            cmd = ["whiptail", "--output-fd", str(capture_fd), *args]
+            res = subprocess.run(cmd, check=False, pass_fds=(capture_fd,))
+            value = self._read_capture_fd(capture_fd)
+            return DialogResult(code=res.returncode, value=value.strip())
+        finally:
+            os.close(capture_fd)
+
+    @staticmethod
+    def _allocate_capture_fd() -> int:
+        if hasattr(os, "memfd_create"):
+            return os.memfd_create("backup-whiptail-output", flags=0)
+        fd, path = tempfile.mkstemp(prefix="backup-whiptail-output-")
+        os.unlink(path)
+        return fd
+
+    @staticmethod
+    def _read_capture_fd(fd: int) -> str:
+        os.lseek(fd, 0, os.SEEK_SET)
+        chunks: list[bytes] = []
+        while True:
+            data = os.read(fd, 4096)
+            if not data:
+                break
+            chunks.append(data)
+        return b"".join(chunks).decode("utf-8", errors="replace")
 
     def menu(self, title: str, text: str, options: list[tuple[str, str]]) -> str | None:
         args = [
