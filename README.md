@@ -20,6 +20,7 @@ uv run backup tui --root /path/to/backup-root
 Notes:
 - `--root` can be omitted when `BACKUP_ROOT` is set.
 - `backup discover github` can omit `--user` and infer from current `gh` login.
+- `discover` is protocol-routed (`backup discover <protocol> ...`), currently `github`.
 - Encrypted payload file is `payload.tar.zst.enc`.
 - Encryption uses `AES-256-GCM` with `scrypt` key derivation.
 - Passphrase source: `BACKUP_PASSPHRASE` first; otherwise prompt only on interactive TTY.

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from .config import load_config
+from .discovery import discover_units, format_discovered
 from .layout import init_root, load_index
 from .protocols import default_registry
 from .recovery import decrypt_unit_payload
@@ -41,22 +42,17 @@ def _cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_discover_github(args: argparse.Namespace) -> int:
-    protocol = default_registry().protocol_by_name("github")
-    discovered = protocol.discover(user=args.user, limit=args.limit)
-    print(f"found repos: {len(discovered)}")
-    for item in discovered:
-        print(
-            "\t".join(
-                [
-                    item.unit_id,
-                    f"fork={item.details.get('fork')}",
-                    f"visibility={item.details.get('visibility')}",
-                    f"default_selected={item.default_selected}",
-                    f"default_encrypt={item.default_encrypt}",
-                ]
-            )
-        )
+def _cmd_discover(args: argparse.Namespace) -> int:
+    registry = default_registry()
+    discovered = discover_units(
+        registry,
+        args.protocol,
+        user=args.user,
+        limit=args.limit,
+    )
+    print(f"found units: {len(discovered)}")
+    for line in format_discovered(discovered):
+        print(line)
     return 0
 
 
@@ -123,19 +119,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
     p_status.set_defaults(func=_cmd_status)
 
-    p_discover = subparsers.add_parser("discover", help="Discover backup units")
-    discover_subparsers = p_discover.add_subparsers(
-        dest="discover_command", required=True
-    )
+    registry = default_registry()
 
-    p_discover_github = discover_subparsers.add_parser(
-        "github", help="Discover GitHub repos"
+    p_discover = subparsers.add_parser("discover", help="Discover backup units")
+    p_discover.add_argument(
+        "protocol", choices=registry.protocol_names(), help="Protocol name"
     )
-    p_discover_github.add_argument(
+    p_discover.add_argument(
         "--user", help="GitHub user or org (default: infer from gh auth)"
     )
-    p_discover_github.add_argument("--limit", type=int, default=1000, help="Max repos")
-    p_discover_github.set_defaults(func=_cmd_discover_github)
+    p_discover.add_argument("--limit", type=int, default=1000, help="Max discover size")
+    p_discover.set_defaults(func=_cmd_discover)
 
     p_select = subparsers.add_parser("select", help="Select or exclude backup units")
     select_subparsers = p_select.add_subparsers(dest="select_command", required=True)

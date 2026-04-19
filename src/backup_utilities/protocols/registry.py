@@ -20,6 +20,9 @@ class ProtocolRegistry:
                 return protocol
         raise ValueError(f"no protocol for unit: {unit_id}")
 
+    def protocol_names(self) -> list[str]:
+        return [protocol.name for protocol in self._protocols]
+
 
 def default_registry() -> ProtocolRegistry:
     return ProtocolRegistry(protocols=[GithubProtocol()])

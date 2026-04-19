@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 
 from .config import load_config
+from .discovery import discover_units, format_discovered
 from .layout import load_index
 from .protocols import default_registry
 from .recovery import decrypt_unit_payload
@@ -80,33 +81,37 @@ def _status_text(root: Path) -> str:
     return "\n".join(lines)
 
 
-def _discover_github(w: Whiptail) -> None:
-    user = w.inputbox("Discover GitHub", "GitHub user/org:")
-    if not user:
+def _discover_units(w: Whiptail) -> None:
+    registry = default_registry()
+    protocol = w.menu(
+        "Discover",
+        "Choose protocol",
+        [(name, f"Discover {name} units") for name in registry.protocol_names()],
+    )
+    if not protocol:
         return
 
-    limit_raw = w.inputbox("Discover GitHub", "Max repos:", "50")
+    user: str | None = None
+    if protocol == "github":
+        user_raw = w.inputbox(
+            "Discover GitHub",
+            "GitHub user/org (empty = infer from gh auth):",
+            "",
+        )
+        user = user_raw if user_raw else None
+
+    limit_raw = w.inputbox("Discover", "Max units:", "50")
     if not limit_raw:
         return
 
     limit = int(limit_raw)
-    protocol = default_registry().protocol_by_name("github")
-    repos = protocol.discover(user=user, limit=limit)
+    units = discover_units(registry, protocol, user=user, limit=limit)
 
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as tmp:
-        tmp.write(f"found repos: {len(repos)}\n\n")
-        for item in repos:
-            tmp.write(
-                "\t".join(
-                    [
-                        item.unit_id,
-                        f"fork={item.details.get('fork')}",
-                        f"visibility={item.details.get('visibility')}",
-                        f"default_selected={item.default_selected}",
-                        f"default_encrypt={item.default_encrypt}",
-                    ]
-                )
-            )
+        tmp.write(f"protocol: {protocol}\n")
+        tmp.write(f"found units: {len(units)}\n\n")
+        for line in format_discovered(units):
+            tmp.write(line)
             tmp.write("\n")
         tmp_path = Path(tmp.name)
     try:
@@ -128,7 +133,7 @@ def run_tui(root: Path) -> int:
             "Select action",
             [
                 ("status", "Show status"),
-                ("discover", "Discover GitHub repos"),
+                ("discover", "Discover units"),
                 ("add", "Select unit"),
                 ("remove", "Exclude unit"),
                 ("encrypt", "Force unit encryption"),
@@ -147,7 +152,7 @@ def run_tui(root: Path) -> int:
             if choice == "status":
                 w.msgbox("Status", _status_text(root))
             elif choice == "discover":
-                _discover_github(w)
+                _discover_units(w)
             elif choice == "add":
                 unit_id = _input_unit_id(w, "Select Unit")
                 if unit_id:
