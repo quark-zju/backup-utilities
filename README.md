@@ -21,6 +21,12 @@
 
 ## 使用示例
 
+### 0. GitHub 登录（首次使用）
+
+```bash
+gh auth login
+```
+
 ### 1. 初始化与查看状态
 
 ```bash
@@ -74,5 +80,6 @@ uv run backup tui
 
 ## 依赖说明
 
+- GitHub 协议依赖：`gh` CLI（需先 `gh auth login`）
 - 加密实现：`AES-256-GCM + scrypt`（通过 `cryptography`）
 - TUI 依赖：系统需安装 `whiptail`
