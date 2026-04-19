@@ -307,30 +307,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    initialize_from_env()
-    parser = build_parser()
-    args = parser.parse_args()
-    root = _resolve_root_if_available(args)
-    label = _command_label(args)
-    if root is not None:
-        append_log(root, "cli", f"START {label}")
-    try:
-        code = args.func(args)
-    except Exception as exc:
-        if root is not None:
-            append_log(root, "cli", f"ERROR {label}: {exc}")
-            append_log(root, "cli", traceback.format_exc().strip())
-        raise
-
-    if root is not None:
-        append_log(root, "cli", f"END {label} exit={code}")
-    return code
+    return _run_entrypoint(None)
 
 
 def tui_main() -> int:
+    return _run_entrypoint(["tui"] + sys.argv[1:])
+
+
+def _run_entrypoint(argv: list[str] | None) -> int:
     initialize_from_env()
     parser = build_parser()
-    args = parser.parse_args(["tui"] + sys.argv[1:])
+    args = parser.parse_args(argv)
     root = _resolve_root_if_available(args)
     label = _command_label(args)
     if root is not None:
