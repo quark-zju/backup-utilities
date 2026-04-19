@@ -11,7 +11,6 @@ from .protocols import default_registry
 from .recovery import decrypt_unit_payload
 from .runner import run_backup, verify_units
 from .selectors import select_add, select_decrypt, select_encrypt, select_remove
-from .tui import run_tui
 
 
 def _resolve_root(args: argparse.Namespace) -> Path:
@@ -102,6 +101,8 @@ def _cmd_decrypt_unit(args: argparse.Namespace) -> int:
 
 def _cmd_tui(args: argparse.Namespace) -> int:
     root = _resolve_root(args)
+    from .ui_textual import run_tui
+
     return run_tui(root)
 
 
@@ -189,7 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_decrypt_unit.set_defaults(func=_cmd_decrypt_unit)
 
-    p_tui = subparsers.add_parser("tui", help="Start whiptail TUI")
+    p_tui = subparsers.add_parser("tui", help="Start Textual TUI")
     p_tui.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
     p_tui.set_defaults(func=_cmd_tui)
 
