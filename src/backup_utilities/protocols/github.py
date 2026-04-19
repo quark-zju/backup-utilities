@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
+import re
 import subprocess
 
 from .base import BackupProtocol, DiscoveredUnit, ExportResult, FingerprintResult
@@ -22,6 +23,27 @@ def _run(cmd: list[str]) -> str:
     return res.stdout
 
 
+def _infer_authenticated_user() -> str:
+    try:
+        login = _run(["gh", "api", "user", "--jq", ".login"]).strip()
+        if login:
+            return login
+    except Exception:
+        pass
+
+    res = subprocess.run(
+        ["gh", "auth", "status"], check=False, capture_output=True, text=True
+    )
+    text = "\n".join([res.stdout, res.stderr])
+    match = re.search(r"Logged in to github\\.com account\\s+([^\\s]+)", text)
+    if match:
+        return match.group(1)
+
+    raise ValueError(
+        "cannot infer GitHub user from gh auth state; pass --user or run gh auth login"
+    )
+
+
 class GithubProtocol(BackupProtocol):
     name = "github"
 
@@ -29,10 +51,11 @@ class GithubProtocol(BackupProtocol):
         return unit_id.startswith("github/")
 
     def discover(self, **kwargs: object) -> list[DiscoveredUnit]:
-        user = str(kwargs.get("user", ""))
+        user_value = kwargs.get("user")
+        user = str(user_value) if user_value else ""
         limit = int(kwargs.get("limit", 1000))
         if not user:
-            raise ValueError("discover github needs --user")
+            user = _infer_authenticated_user()
 
         out = _run(
             [

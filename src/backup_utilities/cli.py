@@ -131,7 +131,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_discover_github = discover_subparsers.add_parser(
         "github", help="Discover GitHub repos"
     )
-    p_discover_github.add_argument("--user", required=True, help="GitHub user or org")
+    p_discover_github.add_argument(
+        "--user", help="GitHub user or org (default: infer from gh auth)"
+    )
     p_discover_github.add_argument("--limit", type=int, default=1000, help="Max repos")
     p_discover_github.set_defaults(func=_cmd_discover_github)
 
