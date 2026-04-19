@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+import stat
+import sys
+from types import SimpleNamespace
+
 import backup_utilities.passphrase as passphrase
 
 TEST_UUID = "123e4567-e89b-12d3-a456-426614174000"
@@ -62,3 +68,45 @@ def test_configure_keyring_uuid_rejects_invalid_uuid() -> None:
             assert str(exc) == "invalid keyring uuid"
     finally:
         _reset_passphrase_state()
+
+
+def test_store_passphrase_creates_private_key_file(monkeypatch, tmp_path: Path) -> None:
+    key_dir = tmp_path / "keyring-keys"
+    monkeypatch.setattr(passphrase, "_KEY_DIR", key_dir)
+
+    store_calls: list[tuple[str, str, str]] = []
+    fake_keyring = SimpleNamespace(
+        set_password=lambda service, username, password: store_calls.append(
+            (service, username, password)
+        ),
+        get_password=lambda _service, _username: None,
+    )
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+
+    passphrase.store_passphrase_in_keyring(TEST_UUID, "secret")
+
+    key_path = key_dir / f"{TEST_UUID}.key"
+    assert key_path.exists()
+    assert store_calls and store_calls[0][0] == "backup-utilities"
+    assert store_calls[0][1] == TEST_UUID
+    if os.name == "posix":
+        mode = stat.S_IMODE(key_path.stat().st_mode)
+        assert mode == 0o600
+
+
+def test_get_passphrase_from_keyring_does_not_create_missing_key(
+    monkeypatch, tmp_path: Path
+) -> None:
+    key_dir = tmp_path / "keyring-keys"
+    key_path = key_dir / f"{TEST_UUID}.key"
+    monkeypatch.setattr(passphrase, "_KEY_DIR", key_dir)
+
+    fake_keyring = SimpleNamespace(
+        set_password=lambda _service, _username, _password: None,
+        get_password=lambda _service, _username: "encrypted-value",
+    )
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+
+    result = passphrase.get_passphrase_from_keyring(TEST_UUID)
+    assert result is None
+    assert not key_path.exists()

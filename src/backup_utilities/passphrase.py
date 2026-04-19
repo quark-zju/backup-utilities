@@ -51,14 +51,34 @@ def _normalize_uuid(value: str) -> str:
         raise ValueError("invalid keyring uuid") from exc
 
 
-def _get_or_create_key(uuid: str) -> bytes:
+def _ensure_key_permissions(key_path: Path) -> None:
+    try:
+        os.chmod(key_path, 0o600)
+    except OSError as exc:
+        _logger.warning(
+            "failed to set key file permissions path=%s error=%s", key_path, exc
+        )
+
+
+def _read_existing_key(uuid: str) -> bytes | None:
     key_path = _get_key_path(uuid)
-    if key_path.exists():
-        _logger.debug("keyring key exists for uuid=%s path=%s", uuid, key_path)
-        return key_path.read_bytes()
+    if not key_path.exists():
+        return None
+    _ensure_key_permissions(key_path)
+    _logger.debug("keyring key exists for uuid=%s path=%s", uuid, key_path)
+    return key_path.read_bytes()
+
+
+def _get_or_create_key(uuid: str) -> bytes:
+    existing = _read_existing_key(uuid)
+    if existing is not None:
+        return existing
+
+    key_path = _get_key_path(uuid)
     key = os.urandom(32)
     _KEY_DIR.mkdir(parents=True, exist_ok=True)
     key_path.write_bytes(key)
+    _ensure_key_permissions(key_path)
     _logger.info("created keyring key for uuid=%s path=%s", uuid, key_path)
     return key
 
@@ -100,7 +120,14 @@ def get_passphrase_from_keyring(uuid: str) -> str | None:
     if encrypted is None:
         _logger.debug("keyring read miss for uuid=%s", uuid)
         return None
-    key = _get_or_create_key(uuid)
+    key = _read_existing_key(uuid)
+    if key is None:
+        _logger.warning(
+            "keyring read unavailable: local key missing for uuid=%s path=%s",
+            uuid,
+            _get_key_path(uuid),
+        )
+        return None
     plain = _decrypt_passphrase(encrypted, key)
     _logger.info("keyring read success for uuid=%s", uuid)
     return plain
