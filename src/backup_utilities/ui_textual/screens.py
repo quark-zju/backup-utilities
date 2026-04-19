@@ -72,6 +72,21 @@ class ConfirmScreen(Screen[bool]):
 
 
 class DiscoverSelectScreen(Screen[list[str] | None]):
+    CSS = """
+    #discover_root {
+      height: 1fr;
+    }
+    #discover_title {
+      height: auto;
+    }
+    #discover_table {
+      height: 1fr;
+    }
+    #discover_hint {
+      height: auto;
+    }
+    """
+
     BINDINGS = [
         Binding("space", "toggle", "Toggle"),
         Binding("a", "all", "All"),
@@ -87,12 +102,13 @@ class DiscoverSelectScreen(Screen[list[str] | None]):
         self._visible_ids: list[str] = [c.unit_id for c in candidates]
 
     def compose(self) -> ComposeResult:
-        yield Static("Discover Result", id="discover_title")
-        yield DataTable(id="discover_table")
-        yield Static(
-            "Space: toggle | A: all | N: none | Enter: confirm add | Esc: cancel/back",
-            id="discover_hint",
-        )
+        with Vertical(id="discover_root"):
+            yield Static("Discover Result", id="discover_title")
+            yield DataTable(id="discover_table")
+            yield Static(
+                "Space: toggle | A: all | N: none | Enter: confirm add | Esc: cancel/back",
+                id="discover_hint",
+            )
 
     def on_mount(self) -> None:
         table = self.query_one("#discover_table", DataTable)
