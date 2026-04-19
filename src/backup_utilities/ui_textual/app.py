@@ -158,6 +158,7 @@ class BackupTextualApp(App[None]):
         table.cursor_type = "row"
         table.add_columns(
             "Sel",
+            "Excl",
             "Unit ID",
             "Encrypt Policy",
             "Last Snapshot Time",
@@ -196,16 +197,16 @@ class BackupTextualApp(App[None]):
         for unit_id in self._state.visible_ids:
             row = self._state.all_rows[unit_id]
             marker = "x" if unit_id in self._state.selected_ids else ""
+            excluded = "x" if row.excluded else ""
             runtime_status = self._backup_status.get(unit_id)
             unit_label = row.unit_id
-            if row.excluded:
-                unit_label = f"{unit_label} [excluded]"
             if runtime_status == "queued":
                 unit_label = f"{unit_label} (queued)"
             elif runtime_status == "backing_up":
                 unit_label = f"{unit_label} (backing up)"
             table.add_row(
                 marker,
+                excluded,
                 unit_label,
                 row.encrypt_policy,
                 _fmt_snapshot_date(row.last_snapshot_time),
