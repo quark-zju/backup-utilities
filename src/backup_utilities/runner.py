@@ -1,0 +1,128 @@
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+
+from .archive import create_tar_zstd, sha256_file
+from .config import load_config
+from .layout import load_index
+from .protocols import ProtocolRegistry
+from .storage import (
+    metadata_path,
+    now_utc,
+    payload_path,
+    read_json,
+    unit_dir,
+    write_json_atomic,
+)
+
+
+def _selected_units(root: Path, unit_arg: str | None) -> list[str]:
+    cfg = load_config(root)
+    units = [unit for unit in cfg.unit_include if unit not in cfg.unit_exclude]
+    if unit_arg:
+        if unit_arg not in units:
+            raise ValueError(f"unit not selected: {unit_arg}")
+        return [unit_arg]
+    return units
+
+
+def run_backup(
+    root: Path, registry: ProtocolRegistry, unit: str | None, dry_run: bool
+) -> int:
+    units = _selected_units(root, unit)
+    if not units:
+        print("no selected units")
+        return 0
+
+    index = load_index(root)
+    changed = 0
+
+    for unit_id in units:
+        protocol = registry.protocol_for_unit(unit_id)
+        unit_meta_path = metadata_path(root, unit_id)
+        prev = read_json(unit_meta_path) if unit_meta_path.exists() else None
+
+        fingerprint = protocol.compute_fingerprint(unit_id)
+        prev_fp = str(prev.get("source_fingerprint")) if prev else None
+
+        if prev_fp == fingerprint.fingerprint:
+            print(f"skip unchanged: {unit_id}")
+            continue
+
+        changed += 1
+        print(f"backup: {unit_id}")
+        if dry_run:
+            continue
+
+        with tempfile.TemporaryDirectory(prefix="backup-unit-") as tmp:
+            staging = Path(tmp)
+            exported = protocol.export_snapshot(unit_id, staging)
+            target_dir = unit_dir(root, unit_id)
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            payload_tmp = payload_path(root, unit_id).with_suffix(".tar.zst.tmp")
+            create_tar_zstd(exported.source_path, payload_tmp)
+            digest = sha256_file(payload_tmp)
+            size_bytes = payload_tmp.stat().st_size
+
+            final_payload = payload_path(root, unit_id)
+            payload_tmp.replace(final_payload)
+
+            metadata = {
+                "unit_id": unit_id,
+                "protocol": protocol.name,
+                "snapshot_time": now_utc(),
+                "source_fingerprint": fingerprint.fingerprint,
+                "payload": {
+                    "path": str(final_payload.relative_to(root)),
+                    "size_bytes": size_bytes,
+                    "sha256": digest,
+                    "compressed": "zstd",
+                    "encrypted": False,
+                },
+                "protocol_metadata": fingerprint.protocol_metadata,
+                "tool_version": "0.1.0",
+            }
+            write_json_atomic(unit_meta_path, metadata)
+
+            index[unit_id] = {
+                "snapshot_time": metadata["snapshot_time"],
+                "source_fingerprint": metadata["source_fingerprint"],
+                "payload_sha256": digest,
+                "payload_size_bytes": size_bytes,
+            }
+
+    write_json_atomic(root / "state" / "index.json", index)
+    print(f"done. changed units: {changed}")
+    return 0
+
+
+def verify_units(root: Path, unit: str | None) -> int:
+    units = _selected_units(root, unit)
+    if not units:
+        print("no selected units")
+        return 0
+
+    ok = 0
+    failed = 0
+    for unit_id in units:
+        meta_path = metadata_path(root, unit_id)
+        payload = payload_path(root, unit_id)
+        if not meta_path.exists() or not payload.exists():
+            print(f"missing files: {unit_id}")
+            failed += 1
+            continue
+
+        meta = read_json(meta_path)
+        expected = str(meta["payload"]["sha256"])
+        current = sha256_file(payload)
+        if expected == current:
+            print(f"ok: {unit_id}")
+            ok += 1
+        else:
+            print(f"mismatch: {unit_id}")
+            failed += 1
+
+    print(f"verify done. ok={ok} failed={failed}")
+    return 1 if failed else 0
