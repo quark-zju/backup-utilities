@@ -11,20 +11,18 @@
 ## 快速开始
 
 ```bash
-# 1) 安装依赖
-uv sync
-
-# 2) GitHub 登录（如要备份 GitHub）
+# GitHub 登录（如要备份 GitHub）
 gh auth login
 
-# 3) 启动 TUI
+# 启动 TUI
 uv run backup tui
+
+# 按 f 列举可备份 repo，选择后按 Enter 确认
+# 按 b 开始备份，私有 repo 默认使用密码加密
 ```
 
-默认备份目录是当前工作目录下的 `./backup`。  
+默认备份目录是当前工作目录下的 `./backup`。
 如需指定其他路径，可设置 `BACKUP_PATH`（兼容旧变量 `BACKUP_ROOT`）。
-
-建议先在 TUI 里按 `f` 列举可备份 repo，然后执行备份。
 
 ## Google Drive 首次使用
 
