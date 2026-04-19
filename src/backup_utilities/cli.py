@@ -7,7 +7,7 @@ from .config import load_config
 from .layout import init_root, load_index
 from .protocols import default_registry
 from .runner import run_backup, verify_units
-from .selectors import select_add, select_remove
+from .selectors import select_add, select_decrypt, select_encrypt, select_remove
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
@@ -25,6 +25,8 @@ def _cmd_status(args: argparse.Namespace) -> int:
     print(f"root: {root}")
     print(f"selected units: {len(cfg.unit_include)}")
     print(f"excluded units: {len(cfg.unit_exclude)}")
+    print(f"forced encrypt units: {len(cfg.unit_encrypt)}")
+    print(f"forced decrypt units: {len(cfg.unit_decrypt)}")
     print(f"indexed snapshots: {len(index)}")
     return 0
 
@@ -59,6 +61,20 @@ def _cmd_select_remove(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     select_remove(root, args.unit_id)
     print(f"excluded: {args.unit_id}")
+    return 0
+
+
+def _cmd_select_encrypt(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    select_encrypt(root, args.unit_id)
+    print(f"force encrypt: {args.unit_id}")
+    return 0
+
+
+def _cmd_select_decrypt(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    select_decrypt(root, args.unit_id)
+    print(f"force decrypt: {args.unit_id}")
     return 0
 
 
@@ -112,6 +128,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_select_remove.add_argument("--root", required=True, help="Backup root path")
     p_select_remove.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_remove.set_defaults(func=_cmd_select_remove)
+
+    p_select_encrypt = select_subparsers.add_parser(
+        "encrypt", help="Force unit encryption"
+    )
+    p_select_encrypt.add_argument("--root", required=True, help="Backup root path")
+    p_select_encrypt.add_argument("unit_id", help="Unit id like github/owner/repo")
+    p_select_encrypt.set_defaults(func=_cmd_select_encrypt)
+
+    p_select_decrypt = select_subparsers.add_parser(
+        "decrypt", help="Force unit unencrypted payload"
+    )
+    p_select_decrypt.add_argument("--root", required=True, help="Backup root path")
+    p_select_decrypt.add_argument("unit_id", help="Unit id like github/owner/repo")
+    p_select_decrypt.set_defaults(func=_cmd_select_decrypt)
 
     p_run = subparsers.add_parser("run", help="Run backup")
     p_run.add_argument("--root", required=True, help="Backup root path")

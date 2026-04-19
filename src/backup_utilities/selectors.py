@@ -29,3 +29,29 @@ def select_remove(root: Path, unit_id: str) -> None:
     cfg.unit_include.sort()
     cfg.unit_exclude.sort()
     write_config(root, cfg)
+
+
+def select_encrypt(root: Path, unit_id: str) -> None:
+    cfg = load_config(root)
+
+    if unit_id not in cfg.unit_encrypt:
+        cfg.unit_encrypt.append(unit_id)
+    if unit_id in cfg.unit_decrypt:
+        cfg.unit_decrypt.remove(unit_id)
+
+    cfg.unit_encrypt.sort()
+    cfg.unit_decrypt.sort()
+    write_config(root, cfg)
+
+
+def select_decrypt(root: Path, unit_id: str) -> None:
+    cfg = load_config(root)
+
+    if unit_id not in cfg.unit_decrypt:
+        cfg.unit_decrypt.append(unit_id)
+    if unit_id in cfg.unit_encrypt:
+        cfg.unit_encrypt.remove(unit_id)
+
+    cfg.unit_encrypt.sort()
+    cfg.unit_decrypt.sort()
+    write_config(root, cfg)
