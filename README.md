@@ -83,7 +83,9 @@ uv run backup tui
 ### 7. Textual TUI 快捷键（MVP）
 
 ```text
-/      聚焦搜索框
+Tab    在搜索框与列表间切换焦点
+Esc    搜索框聚焦时切回列表
+Down   搜索框聚焦时切回列表
 Space  切换当前行选中
 a      全选当前可见项
 n      全不选当前可见项

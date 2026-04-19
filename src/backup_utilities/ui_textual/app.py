@@ -4,6 +4,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 
+from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
@@ -59,7 +60,7 @@ class BackupTextualApp(App[None]):
     """
 
     BINDINGS = [
-        Binding("/", "focus_search", "Search"),
+        Binding("tab", "toggle_focus", "Focus"),
         Binding("space", "toggle_row", "Toggle"),
         Binding("a", "select_visible", "Select Visible"),
         Binding("n", "unselect_visible", "Unselect Visible"),
@@ -94,6 +95,7 @@ class BackupTextualApp(App[None]):
         table = self.query_one("#units_table", DataTable)
         table.cursor_type = "row"
         table.add_columns(
+            "Sel",
             "Unit ID",
             "Encrypt Policy",
             "Last Snapshot Time",
@@ -106,19 +108,25 @@ class BackupTextualApp(App[None]):
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             return fn(*args, **kwargs)
 
-    def _render_table(self) -> None:
+    def _render_table(self, preferred_unit_id: str | None = None) -> None:
+        if preferred_unit_id is None:
+            preferred_unit_id = self._state.focused_id or self._current_unit_id()
+        self._state.focused_id = preferred_unit_id
+
         table = self.query_one("#units_table", DataTable)
         table.clear(columns=False)
         for unit_id in self._state.visible_ids:
             row = self._state.all_rows[unit_id]
-            marker = "[x] " if unit_id in self._state.selected_ids else "[ ] "
+            marker = "x" if unit_id in self._state.selected_ids else ""
             table.add_row(
-                marker + row.unit_id,
+                marker,
+                row.unit_id,
                 row.encrypt_policy,
                 _fmt_ts(row.last_snapshot_time),
                 _fmt_size(row.payload_size_bytes),
                 _fmt_ts(row.last_verify_time),
             )
+        self._restore_cursor(preferred_unit_id)
         self._render_status()
 
     def _render_status(self, message: str | None = None) -> None:
@@ -146,37 +154,73 @@ class BackupTextualApp(App[None]):
             return None
         return self._state.visible_ids[row_index]
 
+    def _restore_cursor(self, preferred_unit_id: str | None) -> None:
+        table = self.query_one("#units_table", DataTable)
+        if not self._state.visible_ids:
+            self._state.focused_id = None
+            return
+
+        target_id = preferred_unit_id
+        if target_id not in self._state.visible_ids:
+            target_id = self._state.visible_ids[0]
+
+        target_index = self._state.visible_ids.index(target_id)
+        table.cursor_row = target_index
+        self._state.focused_id = target_id
+
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id != "search":
             return
+        keep_id = self._state.focused_id or self._current_unit_id()
         prev_visible = list(self._state.visible_ids)
         self._state.apply_query(event.value)
         if self._state.query_error:
             self._state.visible_ids = prev_visible
-        self._render_table()
+        self._render_table(preferred_unit_id=keep_id)
 
     def action_focus_search(self) -> None:
         self.query_one("#search", Input).focus()
 
+    def action_focus_table(self) -> None:
+        self.query_one("#units_table", DataTable).focus()
+
+    def action_toggle_focus(self) -> None:
+        search = self.query_one("#search", Input)
+        if search.has_focus:
+            self.action_focus_table()
+        else:
+            self.action_focus_search()
+
+    def on_key(self, event: events.Key) -> None:
+        search = self.query_one("#search", Input)
+        if search.has_focus and event.key in {"escape", "down"}:
+            self.action_focus_table()
+            event.stop()
+
     def action_reload_units(self) -> None:
+        keep_id = self._state.focused_id or self._current_unit_id()
         rows = collect_unit_rows(self._root)
         self._state.reload_rows(rows)
-        self._render_table()
+        self._render_table(preferred_unit_id=keep_id)
 
     def action_toggle_row(self) -> None:
+        if self.query_one("#search", Input).has_focus:
+            return
         unit_id = self._current_unit_id()
         if not unit_id:
             return
         self._state.toggle_selected(unit_id)
-        self._render_table()
+        self._render_table(preferred_unit_id=unit_id)
 
     def action_select_visible(self) -> None:
+        keep_id = self._state.focused_id or self._current_unit_id()
         self._state.select_visible()
-        self._render_table()
+        self._render_table(preferred_unit_id=keep_id)
 
     def action_unselect_visible(self) -> None:
+        keep_id = self._state.focused_id or self._current_unit_id()
         self._state.unselect_visible()
-        self._render_table()
+        self._render_table(preferred_unit_id=keep_id)
 
     def _selected_ids(self) -> list[str]:
         return sorted(self._state.selected_ids)
@@ -277,7 +321,7 @@ class BackupTextualApp(App[None]):
         select_add(self._root, unit_id)
         self.action_reload_units()
         self._state.selected_ids.add(unit_id)
-        self._render_table()
+        self._render_table(preferred_unit_id=unit_id)
         self._render_status(f"added unit={unit_id}")
 
     async def action_discover_add(self) -> None:

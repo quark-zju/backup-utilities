@@ -13,12 +13,15 @@ class UnitListState:
     visible_ids: list[str] = field(default_factory=list)
     query_text: str = ""
     query_error: str | None = None
+    focused_id: str | None = None
 
     def reload_rows(self, rows: list[UnitRow]) -> None:
         self.all_rows = {row.unit_id: row for row in rows}
         self.selected_ids = {
             unit_id for unit_id in self.selected_ids if unit_id in self.all_rows
         }
+        if self.focused_id not in self.all_rows:
+            self.focused_id = None
         self.apply_query(self.query_text)
 
     def apply_query(self, query: str) -> None:
@@ -28,6 +31,8 @@ class UnitListState:
             filtered = filter_unit_rows(rows, query)
             self.visible_ids = [row.unit_id for row in filtered]
             self.query_error = None
+            if self.focused_id not in self.visible_ids:
+                self.focused_id = self.visible_ids[0] if self.visible_ids else None
         except ValueError as exc:
             self.query_error = str(exc)
 
