@@ -488,8 +488,26 @@ class BackupTextualApp(App[None]):
 
     def on_key(self, event: events.Key) -> None:
         search = self.query_one("#search", Input)
-        if search.has_focus and event.key in {"escape", "down"}:
-            self.action_focus_table()
+        if search.has_focus:
+            if event.key == "enter":
+                self.action_focus_table()
+                event.stop()
+                return
+            if event.key == "escape":
+                if search.value:
+                    search.value = ""
+                else:
+                    self.action_focus_table()
+                event.stop()
+                return
+            if event.key == "down":
+                self.action_focus_table()
+                event.stop()
+                return
+
+        table = self.query_one("#units_table", DataTable)
+        if table.has_focus and event.key == "escape":
+            self.action_focus_search()
             event.stop()
 
     def action_reload_units(self) -> None:
