@@ -23,16 +23,11 @@ from .selectors import (
 )
 
 
-ROOT_HELP = "Backup root path (fallback: BACKUP_ROOT, BACKUP_PATH, ./backup)"
+ROOT_HELP = "Backup root path (fallback: BACKUP_ROOT, ./backup)"
 
 
 def _root_raw_from_args(args: argparse.Namespace) -> str:
-    return (
-        args.root
-        or os.environ.get("BACKUP_ROOT")
-        or os.environ.get("BACKUP_PATH")
-        or str(Path.cwd() / "backup")
-    )
+    return args.root or os.environ.get("BACKUP_ROOT") or str(Path.cwd() / "backup")
 
 
 def _ensure_initialized_root(root: Path) -> None:

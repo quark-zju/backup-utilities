@@ -3,7 +3,6 @@
 ## 常用环境变量
 
 - `BACKUP_ROOT`：备份根目录（默认 `./backup`）。
-- `BACKUP_PATH`：兼容旧写法，仍可用。
 - `BACKUP_PASSPHRASE`：加密/解密口令。
 - `BACKUP_PLAIN_TRACEBACK=1`：TUI 异常时输出朴素 traceback。
 - `BACKUP_GDRIVE_CLIENT_SECRET`：Google OAuth 客户端密钥 JSON 路径。
