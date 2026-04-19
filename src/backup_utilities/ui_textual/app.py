@@ -79,6 +79,7 @@ class BackupTextualApp(App[None]):
     """
 
     BINDINGS = [
+        Binding("/", "focus_search", "Search"),
         Binding("tab", "toggle_focus", "Focus"),
         Binding("ctrl+e", "manage_passphrase", "Passphrase"),
         Binding("space", "toggle_row", "Toggle"),
@@ -155,6 +156,7 @@ class BackupTextualApp(App[None]):
         self.set_interval(0.2, self._drain_backup_events)
         self._backup_worker.start()
         self.action_reload_units()
+        table.focus()
         self._log("START tui")
 
     def on_unmount(self) -> None:
@@ -345,7 +347,10 @@ class BackupTextualApp(App[None]):
         else:
             self.action_focus_search()
 
-    async def action_manage_passphrase(self) -> None:
+    def action_manage_passphrase(self) -> None:
+        self.run_worker(self._manage_passphrase_flow(), thread=False, exclusive=True)
+
+    async def _manage_passphrase_flow(self) -> None:
         if has_passphrase_cached():
             clear_cached_passphrase()
             self._render_status("passphrase cache cleared")
@@ -417,7 +422,10 @@ class BackupTextualApp(App[None]):
                 return True
         return False
 
-    async def action_backup_selected(self) -> None:
+    def action_backup_selected(self) -> None:
+        self.run_worker(self._backup_selected_flow(), thread=False, exclusive=True)
+
+    async def _backup_selected_flow(self) -> None:
         selected = self._selected_ids()
         if not selected:
             self._render_status("no selected units")
@@ -502,7 +510,10 @@ class BackupTextualApp(App[None]):
         self._render_status(f"decrypt applied={applied} skipped={skipped}")
         self._log(f"decrypt applied={applied} skipped={skipped}")
 
-    async def action_remove_selected(self) -> None:
+    def action_remove_selected(self) -> None:
+        self.run_worker(self._remove_selected_flow(), thread=False, exclusive=True)
+
+    async def _remove_selected_flow(self) -> None:
         selected = self._selected_ids()
         if not selected:
             self._render_status("no selected units")
@@ -525,7 +536,10 @@ class BackupTextualApp(App[None]):
         self._render_status(f"removed units={len(selected)}")
         self._log(f"removed units={len(selected)}")
 
-    async def action_add_manual(self) -> None:
+    def action_add_manual(self) -> None:
+        self.run_worker(self._add_manual_flow(), thread=False, exclusive=True)
+
+    async def _add_manual_flow(self) -> None:
         unit_id = await self.push_screen_wait(
             TextPromptScreen("Add Unit", "Unit id (e.g. github/owner/repo):")
         )
@@ -544,7 +558,10 @@ class BackupTextualApp(App[None]):
         self._render_status(f"added unit={unit_id}")
         self._log(f"added unit={unit_id}")
 
-    async def action_discover_add(self) -> None:
+    def action_discover_add(self) -> None:
+        self.run_worker(self._discover_add_flow(), thread=False, exclusive=True)
+
+    async def _discover_add_flow(self) -> None:
         protocol = "github"
         user = await self.push_screen_wait(
             TextPromptScreen(
