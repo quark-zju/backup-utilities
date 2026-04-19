@@ -33,8 +33,9 @@ def _build_matcher(query: str):
 
     def _matches(row: UnitRow) -> bool:
         unit_id = row.unit_id.casefold()
+        unit_label = row.unit_label.casefold()
         for token in text_tokens:
-            if token not in unit_id:
+            if token not in unit_id and token not in unit_label:
                 return False
 
         for cond in date_conditions:

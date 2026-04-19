@@ -220,7 +220,7 @@ class BackupTextualApp(App[None]):
         excluded = "x" if row.excluded else ""
         runtime_status = self._backup_status.get(unit_id)
         passphrase_note = self._passphrase_check_notes.get(unit_id)
-        unit_label = row.unit_id
+        unit_label = row.unit_label
         if runtime_status == "queued":
             unit_label = f"{unit_label} (queued)"
         elif runtime_status == "backing_up":

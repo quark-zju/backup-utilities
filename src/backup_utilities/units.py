@@ -10,6 +10,7 @@ from .storage import read_json
 @dataclass(slots=True)
 class UnitRow:
     unit_id: str
+    unit_label: str
     selected: bool
     excluded: bool
     encrypt_policy: str
@@ -45,6 +46,9 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
         payload = meta.get("payload", {}) if isinstance(meta, dict) else {}
         verify = meta.get("verify", {}) if isinstance(meta, dict) else {}
         check = meta.get("check", {}) if isinstance(meta, dict) else {}
+        protocol_meta = (
+            meta.get("protocol_metadata", {}) if isinstance(meta, dict) else {}
+        )
 
         if unit_id in cfg.unit_encrypt:
             policy = "forced-encrypt"
@@ -58,9 +62,17 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
             encrypted = bool(payload.get("encrypted"))
             policy_display = f"{policy} ({'encrypted' if encrypted else 'plain'})"
 
+        unit_label = unit_id
+        if unit_id.startswith("gdrive/folder/") and isinstance(protocol_meta, dict):
+            folder_name = protocol_meta.get("folder_name")
+            folder_id = protocol_meta.get("folder_id")
+            if folder_name and folder_id:
+                unit_label = f"gdrive/{folder_name} [{folder_id}]"
+
         rows.append(
             UnitRow(
                 unit_id=unit_id,
+                unit_label=unit_label,
                 selected=unit_id in cfg.unit_include
                 and unit_id not in cfg.unit_exclude,
                 excluded=unit_id in cfg.unit_exclude,
