@@ -33,6 +33,7 @@ from ..selectors import (
     select_encrypt,
     select_exclude,
     select_remove,
+    select_unexclude,
 )
 from ..units import collect_unit_rows
 from .screens import (
@@ -95,7 +96,7 @@ class BackupTextualApp(App[None]):
         Binding("b", "backup_selected", "Backup"),
         Binding("e", "encrypt_selected", "Encrypt"),
         Binding("d", "decrypt_selected", "Decrypt"),
-        Binding("v", "exclude_selected", "Exclude"),
+        Binding("v", "toggle_exclude_selected", "Toggle Exclude"),
         Binding("x", "remove_selected", "Remove"),
         Binding("m", "add_manual", "Add Manual"),
         Binding("f", "discover_add", "Discover Add"),
@@ -195,6 +196,8 @@ class BackupTextualApp(App[None]):
             marker = "x" if unit_id in self._state.selected_ids else ""
             runtime_status = self._backup_status.get(unit_id)
             unit_label = row.unit_id
+            if row.excluded:
+                unit_label = f"{unit_label} [excluded]"
             if runtime_status == "queued":
                 unit_label = f"{unit_label} (queued)"
             elif runtime_status == "backing_up":
@@ -553,28 +556,32 @@ class BackupTextualApp(App[None]):
         self._render_status(f"removed units={len(selected)}")
         self._log(f"removed units={len(selected)}")
 
-    def action_exclude_selected(self) -> None:
+    def action_toggle_exclude_selected(self) -> None:
         selected = self._selected_ids()
         if not selected:
             self._render_status("no selected units")
             return
 
-        applied = 0
-        skipped = 0
+        excluded_now = 0
+        unexcluded_now = 0
         cfg = load_config(self._root)
         excluded = set(cfg.unit_exclude)
         for unit_id in selected:
             if unit_id in excluded:
-                skipped += 1
-                continue
-            select_exclude(self._root, unit_id)
-            applied += 1
-            excluded.add(unit_id)
+                select_unexclude(self._root, unit_id)
+                unexcluded_now += 1
+                excluded.remove(unit_id)
+            else:
+                select_exclude(self._root, unit_id)
+                excluded_now += 1
+                excluded.add(unit_id)
 
         self._state.selected_ids.clear()
         self.action_reload_units()
-        self._render_status(f"exclude applied={applied} skipped={skipped}")
-        self._log(f"exclude applied={applied} skipped={skipped}")
+        self._render_status(
+            f"exclude toggled: excluded={excluded_now} unexcluded={unexcluded_now}"
+        )
+        self._log(f"exclude toggled excluded={excluded_now} unexcluded={unexcluded_now}")
 
     def action_add_manual(self) -> None:
         self.run_worker(self._add_manual_flow(), thread=False, exclusive=True)

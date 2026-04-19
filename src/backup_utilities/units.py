@@ -11,6 +11,7 @@ from .storage import read_json
 class UnitRow:
     unit_id: str
     selected: bool
+    excluded: bool
     encrypt_policy: str
     last_snapshot_time: str | None
     payload_size_bytes: int | None
@@ -61,6 +62,7 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
                 unit_id=unit_id,
                 selected=unit_id in cfg.unit_include
                 and unit_id not in cfg.unit_exclude,
+                excluded=unit_id in cfg.unit_exclude,
                 encrypt_policy=policy_display,
                 last_snapshot_time=(
                     str(meta.get("snapshot_time"))

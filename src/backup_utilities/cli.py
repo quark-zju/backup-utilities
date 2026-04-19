@@ -19,6 +19,7 @@ from .selectors import (
     select_encrypt,
     select_exclude,
     select_remove,
+    select_unexclude,
 )
 
 
@@ -101,6 +102,13 @@ def _cmd_select_exclude(args: argparse.Namespace) -> int:
     root = _resolve_root(args)
     select_exclude(root, args.unit_id)
     print(f"excluded (keep include): {args.unit_id}")
+    return 0
+
+
+def _cmd_select_unexclude(args: argparse.Namespace) -> int:
+    root = _resolve_root(args)
+    select_unexclude(root, args.unit_id)
+    print(f"unexcluded: {args.unit_id}")
     return 0
 
 
@@ -199,6 +207,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_select_exclude.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_exclude.set_defaults(func=_cmd_select_exclude)
+
+    p_select_unexclude = select_subparsers.add_parser(
+        "unexclude", help="Remove unit from exclude list"
+    )
+    p_select_unexclude.add_argument(
+        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+    )
+    p_select_unexclude.add_argument("unit_id", help="Unit id like github/owner/repo")
+    p_select_unexclude.set_defaults(func=_cmd_select_unexclude)
 
     p_select_encrypt = select_subparsers.add_parser(
         "encrypt", help="Force unit encryption"

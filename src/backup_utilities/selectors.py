@@ -41,6 +41,16 @@ def select_exclude(root: Path, unit_id: str) -> None:
     write_config(root, cfg)
 
 
+def select_unexclude(root: Path, unit_id: str) -> None:
+    cfg = load_config(root)
+
+    if unit_id in cfg.unit_exclude:
+        cfg.unit_exclude.remove(unit_id)
+
+    cfg.unit_exclude.sort()
+    write_config(root, cfg)
+
+
 def select_encrypt(root: Path, unit_id: str) -> None:
     cfg = load_config(root)
 

@@ -54,6 +54,8 @@ uv run backup select add github/owner/repo
 uv run backup select remove github/owner/repo
 # 仅加入 exclude（不改 include）
 uv run backup select exclude github/owner/repo
+# 从 exclude 移除
+uv run backup select unexclude github/owner/repo
 ```
 
 ### 3. 配置单元加密策略
@@ -100,7 +102,7 @@ n      全不选当前可见项
 b      对选中项串行执行 backup
 e      对选中项执行 force encrypt（已是 encrypt 跳过）
 d      对选中项执行 force decrypt（已是 decrypt 跳过）
-v      对选中项执行 exclude（仅加入 exclude，不移除 include）
+v      对选中项执行 toggle exclude（已 exclude 则取消）
 x      从 selected 中移除（带确认）
 m      手动添加 unit
 f      discover 后批量添加
