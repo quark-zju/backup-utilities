@@ -13,6 +13,7 @@ uv run backup select encrypt --root /path/to/backup-root github/owner/repo
 export BACKUP_PASSPHRASE='your-passphrase'
 uv run backup run --root /path/to/backup-root
 uv run backup verify --root /path/to/backup-root
+uv run backup decrypt-unit --root /path/to/backup-root --unit github/owner/repo --out /tmp/github-owner-repo.tar.zst
 ```
 
 Notes:

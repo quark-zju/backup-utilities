@@ -6,6 +6,7 @@ from pathlib import Path
 from .config import load_config
 from .layout import init_root, load_index
 from .protocols import default_registry
+from .recovery import decrypt_unit_payload
 from .runner import run_backup, verify_units
 from .selectors import select_add, select_decrypt, select_encrypt, select_remove
 
@@ -88,6 +89,12 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     return verify_units(root, unit=args.unit)
 
 
+def _cmd_decrypt_unit(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    out = Path(args.out).resolve()
+    return decrypt_unit_payload(root=root, unit_id=args.unit, out=out)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="backup", description="Unit-based incremental backup"
@@ -153,6 +160,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_verify.add_argument("--root", required=True, help="Backup root path")
     p_verify.add_argument("--unit", help="Single selected unit to verify")
     p_verify.set_defaults(func=_cmd_verify)
+
+    p_decrypt_unit = subparsers.add_parser(
+        "decrypt-unit", help="Decrypt encrypted payload for one unit"
+    )
+    p_decrypt_unit.add_argument("--root", required=True, help="Backup root path")
+    p_decrypt_unit.add_argument("--unit", required=True, help="Unit id to decrypt")
+    p_decrypt_unit.add_argument(
+        "--out", required=True, help="Output tar.zst path for decrypted payload"
+    )
+    p_decrypt_unit.set_defaults(func=_cmd_decrypt_unit)
 
     return parser
 
