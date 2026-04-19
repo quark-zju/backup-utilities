@@ -63,7 +63,7 @@ def _fmt_size(size_bytes: int | None) -> str:
 def _fmt_ts(value: str | None) -> str:
     if not value:
         return "-"
-    return value
+    return value.split("T", maxsplit=1)[0]
 
 
 def _fmt_snapshot_date(value: str | None) -> str:
