@@ -430,6 +430,15 @@ class BackupTextualApp(App[None]):
     def _selected_ids(self) -> list[str]:
         return sorted(self._state.selected_ids)
 
+    def _operation_target_ids(self) -> list[str]:
+        selected = self._selected_ids()
+        if selected:
+            return selected
+        current = self._current_unit_id()
+        if current:
+            return [current]
+        return []
+
     def _selected_need_passphrase(self, selected: list[str]) -> bool:
         cfg = load_config(self._root)
         if cfg.default_encrypt:
@@ -446,9 +455,9 @@ class BackupTextualApp(App[None]):
         self.run_worker(self._backup_selected_flow(), thread=False, exclusive=True)
 
     async def _backup_selected_flow(self) -> None:
-        selected = self._selected_ids()
+        selected = self._operation_target_ids()
         if not selected:
-            self._render_status("no selected units")
+            self._render_status("no selected/focused units")
             return
 
         if self._selected_need_passphrase(selected):
@@ -489,9 +498,9 @@ class BackupTextualApp(App[None]):
         self._render_status(f"backup queued={queued_now} skipped={skipped}")
 
     def action_encrypt_selected(self) -> None:
-        selected = self._selected_ids()
+        selected = self._operation_target_ids()
         if not selected:
-            self._render_status("no selected units")
+            self._render_status("no selected/focused units")
             return
 
         cfg = load_config(self._root)
@@ -510,9 +519,9 @@ class BackupTextualApp(App[None]):
         self._log(f"encrypt applied={applied} skipped={skipped}")
 
     def action_decrypt_selected(self) -> None:
-        selected = self._selected_ids()
+        selected = self._operation_target_ids()
         if not selected:
-            self._render_status("no selected units")
+            self._render_status("no selected/focused units")
             return
 
         cfg = load_config(self._root)
@@ -534,9 +543,9 @@ class BackupTextualApp(App[None]):
         self.run_worker(self._remove_selected_flow(), thread=False, exclusive=True)
 
     async def _remove_selected_flow(self) -> None:
-        selected = self._selected_ids()
+        selected = self._operation_target_ids()
         if not selected:
-            self._render_status("no selected units")
+            self._render_status("no selected/focused units")
             return
 
         confirm = await self.push_screen_wait(
@@ -557,9 +566,9 @@ class BackupTextualApp(App[None]):
         self._log(f"removed units={len(selected)}")
 
     def action_toggle_exclude_selected(self) -> None:
-        selected = self._selected_ids()
+        selected = self._operation_target_ids()
         if not selected:
-            self._render_status("no selected units")
+            self._render_status("no selected/focused units")
             return
 
         excluded_now = 0
