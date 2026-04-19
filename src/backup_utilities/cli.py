@@ -10,7 +10,7 @@ from .config import config_path, load_config
 from .discovery import discover_units, format_discovered
 from .layout import init_root, load_index
 from .logging_utils import append_log
-from .passphrase import initialize_from_env
+from .passphrase import configure_keyring_uuid, initialize_from_env
 from .protocols import default_registry
 from .recovery import decrypt_unit_payload
 from .runner import run_backup, verify_units
@@ -41,6 +41,8 @@ def _ensure_initialized_root(root: Path) -> None:
 def _resolve_root(args: argparse.Namespace) -> Path:
     root = Path(_root_raw_from_args(args)).resolve()
     _ensure_initialized_root(root)
+    cfg = load_config(root)
+    configure_keyring_uuid(cfg.uuid)
     return root
 
 
@@ -302,6 +304,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_tui.set_defaults(func=_cmd_tui)
 
     return parser
+
+
+def main() -> int:
+    initialize_from_env()
+    parser = build_parser()
+    args = parser.parse_args()
+    root = _resolve_root_if_available(args)
+    label = _command_label(args)
+    if root is not None:
+        append_log(root, "cli", f"START {label}")
+    try:
+        code = args.func(args)
+    except Exception as exc:
+        if root is not None:
+            append_log(root, "cli", f"ERROR {label}: {exc}")
+            append_log(root, "cli", traceback.format_exc().strip())
+        raise
+
+    if root is not None:
+        append_log(root, "cli", f"END {label} exit={code}")
+    return code
 
 
 def tui_main() -> int:

@@ -20,7 +20,9 @@ from ..config import load_config
 from ..discovery import discover_units, write_partial_metadata_from_discovered
 from ..logging_utils import append_log
 from ..passphrase import (
+    cache_confirmed_passphrase,
     clear_cached_passphrase,
+    configure_keyring_uuid,
     get_passphrase,
     has_passphrase_cached,
     set_cached_passphrase,
@@ -169,6 +171,10 @@ class BackupTextualApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        cfg = load_config(self._root)
+        configure_keyring_uuid(cfg.uuid)
+        self._log(f"keyring uuid configured uuid={cfg.uuid}")
+
         table = self.query_one("#units_table", DataTable)
         table.cursor_type = "row"
         table.add_columns(
@@ -456,9 +462,14 @@ class BackupTextualApp(App[None]):
         if entered is None:
             self._render_status("passphrase unchanged")
             return
-        set_cached_passphrase(entered)
-        self._render_status("passphrase cached")
-        self._log("passphrase cached")
+        keyring_status = cache_confirmed_passphrase(entered)
+        if keyring_status == "stored":
+            self._render_status("passphrase cached and stored in keyring")
+        elif keyring_status == "failed":
+            self._render_status("passphrase cached; keyring store failed")
+        else:
+            self._render_status("passphrase cached; keyring store skipped")
+        self._log(f"passphrase cached keyring={keyring_status}")
 
     async def _prompt_new_passphrase_with_confirmation(
         self,
@@ -600,7 +611,8 @@ class BackupTextualApp(App[None]):
                 if entered is None:
                     self._render_status("backup cancelled: passphrase not provided")
                     return
-                set_cached_passphrase(entered)
+                keyring_status = cache_confirmed_passphrase(entered)
+                self._log(f"backup prompt passphrase keyring={keyring_status}")
 
         queued_now = 0
         skipped = 0
@@ -644,7 +656,8 @@ class BackupTextualApp(App[None]):
                 if entered is None:
                     self._render_status("encrypt cancelled: passphrase not provided")
                     return
-                set_cached_passphrase(entered)
+                keyring_status = cache_confirmed_passphrase(entered)
+                self._log(f"encrypt prompt passphrase keyring={keyring_status}")
                 passphrase = entered
 
         updated = 0
