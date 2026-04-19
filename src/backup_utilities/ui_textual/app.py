@@ -92,7 +92,9 @@ class BackupTextualApp(App[None]):
         self._protocol_registry = default_registry()
         self._state = UnitListState()
         self._backup_queue: queue.Queue[str | None] = queue.Queue()
-        self._backup_events: queue.Queue[tuple[str, str, bool | None]] = queue.Queue()
+        self._backup_events: queue.Queue[tuple[str, str, bool | None, str | None]] = (
+            queue.Queue()
+        )
         self._backup_status: dict[str, str] = {}
         self._backup_worker_stop = threading.Event()
         self._backup_worker = threading.Thread(
@@ -151,6 +153,13 @@ class BackupTextualApp(App[None]):
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             return fn(*args, **kwargs)
 
+    def _capture_call_with_output(self, fn, *args, **kwargs):
+        out_io = StringIO()
+        err_io = StringIO()
+        with redirect_stdout(out_io), redirect_stderr(err_io):
+            result = fn(*args, **kwargs)
+        return result, out_io.getvalue(), err_io.getvalue()
+
     def _render_table(self, preferred_unit_id: str | None = None) -> None:
         if preferred_unit_id is None:
             preferred_unit_id = self._state.focused_id or self._current_unit_id()
@@ -204,22 +213,40 @@ class BackupTextualApp(App[None]):
             unit_id = self._backup_queue.get()
             if unit_id is None:
                 break
-            self._backup_events.put(("start", unit_id, None))
-            code = self._capture_call(
+            self._backup_events.put(("start", unit_id, None, None))
+            result, out, err = self._capture_call_with_output(
                 run_backup,
                 self._root,
                 self._protocol_registry,
                 unit_id,
                 False,
             )
-            self._backup_events.put(("done", unit_id, code == 0))
+            code = int(result)
+            failure_message = None
+            if code != 0:
+                failure_message = self._extract_failure_message(out, err)
+            self._backup_events.put(("done", unit_id, code == 0, failure_message))
+
+    @staticmethod
+    def _extract_failure_message(stdout_text: str, stderr_text: str) -> str:
+        merged_lines = [
+            line.strip() for line in (stderr_text + "\n" + stdout_text).splitlines()
+        ]
+        merged_lines = [line for line in merged_lines if line]
+        if not merged_lines:
+            return "unknown failure"
+        for line in reversed(merged_lines):
+            low = line.lower()
+            if "failed" in low or "error" in low or "mismatch" in low:
+                return line
+        return merged_lines[-1]
 
     def _drain_backup_events(self) -> None:
         updated = False
         message: str | None = None
         while True:
             try:
-                phase, unit_id, ok = self._backup_events.get_nowait()
+                phase, unit_id, ok, detail = self._backup_events.get_nowait()
             except queue.Empty:
                 break
 
@@ -232,7 +259,10 @@ class BackupTextualApp(App[None]):
                 if ok:
                     message = f"backup done: {unit_id}"
                 else:
-                    message = f"backup failed: {unit_id}"
+                    if detail:
+                        message = f"backup failed: {unit_id}: {detail}"
+                    else:
+                        message = f"backup failed: {unit_id}"
 
         if updated:
             self.action_reload_units()
@@ -342,6 +372,7 @@ class BackupTextualApp(App[None]):
             self._backup_status[unit_id] = "queued"
             self._backup_queue.put(unit_id)
             queued_now += 1
+        self._state.selected_ids.clear()
         self._render_table()
         self._render_status(f"backup queued={queued_now} skipped={skipped}")
 
@@ -361,6 +392,7 @@ class BackupTextualApp(App[None]):
             select_encrypt(self._root, unit_id)
             applied += 1
             cfg = load_config(self._root)
+        self._state.selected_ids.clear()
         self.action_reload_units()
         self._render_status(f"encrypt applied={applied} skipped={skipped}")
 
@@ -380,6 +412,7 @@ class BackupTextualApp(App[None]):
             select_decrypt(self._root, unit_id)
             applied += 1
             cfg = load_config(self._root)
+        self._state.selected_ids.clear()
         self.action_reload_units()
         self._render_status(f"decrypt applied={applied} skipped={skipped}")
 
@@ -401,6 +434,7 @@ class BackupTextualApp(App[None]):
         for unit_id in selected:
             select_remove(self._root, unit_id)
             self._state.selected_ids.discard(unit_id)
+        self._state.selected_ids.clear()
         self.action_reload_units()
         self._render_status(f"removed units={len(selected)}")
 
