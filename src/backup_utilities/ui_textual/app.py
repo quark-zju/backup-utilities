@@ -184,8 +184,16 @@ class BackupTextualApp(App[None]):
             target_id = self._state.visible_ids[0]
 
         target_index = self._state.visible_ids.index(target_id)
-        table.cursor_row = target_index
+        table.move_cursor(row=target_index, animate=False, scroll=False)
         self._state.focused_id = target_id
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        if event.data_table.id != "units_table":
+            return
+        row = event.cursor_row
+        if row < 0 or row >= len(self._state.visible_ids):
+            return
+        self._state.focused_id = self._state.visible_ids[row]
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id != "search":
