@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 import threading
+import uuid as _uuid
 from typing import Callable, Literal
 
 PromptFunc = Callable[[str], str | None]
@@ -43,6 +44,13 @@ def _get_key_path(uuid: str) -> Path:
     return _KEY_DIR / f"{uuid}.key"
 
 
+def _normalize_uuid(value: str) -> str:
+    try:
+        return str(_uuid.UUID(value))
+    except ValueError as exc:
+        raise ValueError("invalid keyring uuid") from exc
+
+
 def _get_or_create_key(uuid: str) -> bytes:
     key_path = _get_key_path(uuid)
     if key_path.exists():
@@ -73,6 +81,7 @@ def _decrypt_passphrase(encrypted: str, key: bytes) -> str:
 
 
 def store_passphrase_in_keyring(uuid: str, passphrase: str) -> None:
+    uuid = _normalize_uuid(uuid)
     _logger.info("attempt keyring write for uuid=%s", uuid)
     key = _get_or_create_key(uuid)
     encrypted = _encrypt_passphrase(passphrase, key)
@@ -83,6 +92,7 @@ def store_passphrase_in_keyring(uuid: str, passphrase: str) -> None:
 
 
 def get_passphrase_from_keyring(uuid: str) -> str | None:
+    uuid = _normalize_uuid(uuid)
     _logger.debug("attempt keyring read for uuid=%s", uuid)
     import keyring
 
@@ -98,7 +108,8 @@ def get_passphrase_from_keyring(uuid: str) -> str | None:
 
 def configure_keyring_uuid(uuid: str | None) -> None:
     global _keyring_uuid
-    normalized = uuid.strip() if uuid else ""
+    raw = uuid.strip() if uuid else ""
+    normalized = _normalize_uuid(raw) if raw else ""
     with _lock:
         _keyring_uuid = normalized or None
     if normalized:
