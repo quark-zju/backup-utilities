@@ -80,7 +80,7 @@ class BackupTextualApp(App[None]):
 
     BINDINGS = [
         Binding("tab", "toggle_focus", "Focus"),
-        Binding("ctrl+p", "clear_passphrase_cache", "Clear Passphrase"),
+        Binding("ctrl+e", "manage_passphrase", "Passphrase"),
         Binding("space", "toggle_row", "Toggle"),
         Binding("a", "select_visible", "Select Visible"),
         Binding("n", "unselect_visible", "Unselect Visible"),
@@ -212,8 +212,7 @@ class BackupTextualApp(App[None]):
         chunks = [
             (
                 f"total={total} visible={visible} selected={selected} "
-                f"hidden_selected={hidden} queued={queued} backing_up={backing_up} "
-                f"passphrase_cached={'yes' if has_passphrase_cached() else 'no'}"
+                f"hidden_selected={hidden} queued={queued} backing_up={backing_up}"
             )
         ]
         if self._state.query_error:
@@ -346,10 +345,31 @@ class BackupTextualApp(App[None]):
         else:
             self.action_focus_search()
 
-    def action_clear_passphrase_cache(self) -> None:
-        clear_cached_passphrase()
-        self._render_status("passphrase cache cleared")
-        self._log("passphrase cache cleared")
+    async def action_manage_passphrase(self) -> None:
+        if has_passphrase_cached():
+            clear_cached_passphrase()
+            self._render_status("passphrase cache cleared")
+            self._log("passphrase cache cleared")
+            return
+
+        entered = await self.push_screen_wait(
+            TextPromptScreen(
+                "Passphrase",
+                "Enter passphrase to cache in memory:",
+                "",
+                password=True,
+            )
+        )
+        if entered is None:
+            self._render_status("passphrase unchanged")
+            return
+        entered = entered.strip()
+        if not entered:
+            self._render_status("empty passphrase ignored")
+            return
+        set_cached_passphrase(entered)
+        self._render_status("passphrase cached")
+        self._log("passphrase cached")
 
     def on_key(self, event: events.Key) -> None:
         search = self.query_one("#search", Input)

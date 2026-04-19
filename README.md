@@ -100,7 +100,7 @@ d      对选中项执行 force decrypt（已是 decrypt 跳过）
 x      从 selected 中移除（带确认）
 m      手动添加 unit
 f      discover 后批量添加
-Ctrl+P 清空进程内口令缓存
+Ctrl+E 口令管理（有缓存则清除；无缓存则输入并缓存）
 r      刷新列表
 q      退出
 ```
