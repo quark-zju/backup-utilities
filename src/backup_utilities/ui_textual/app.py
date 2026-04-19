@@ -75,6 +75,9 @@ def _fmt_snapshot_date(value: str | None) -> str:
 
 
 class BackupTextualApp(App[None]):
+    TITLE = "Backup Utilities"
+    SUB_TITLE = "Unit-Based Incremental Backup"
+
     CSS = """
     #main {
       height: 1fr;
