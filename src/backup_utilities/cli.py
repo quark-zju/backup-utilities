@@ -69,10 +69,12 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 
 def _cmd_discover(args: argparse.Namespace) -> int:
+    root = _resolve_root_if_available(args)
     registry = default_registry()
     discovered = discover_units(
         registry,
         args.protocol,
+        root=root,
         user=args.user,
         limit=args.limit,
     )
@@ -171,6 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
     registry = default_registry()
 
     p_discover = subparsers.add_parser("discover", help="Discover backup units")
+    p_discover.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
     p_discover.add_argument(
         "protocol", choices=registry.protocol_names(), help="Protocol name"
     )

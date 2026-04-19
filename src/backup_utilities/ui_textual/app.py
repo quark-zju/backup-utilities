@@ -905,6 +905,7 @@ class BackupTextualApp(App[None]):
                 discover_units,
                 self._protocol_registry,
                 protocol,
+                root=self._root,
                 user=user,
                 limit=limit,
             )
