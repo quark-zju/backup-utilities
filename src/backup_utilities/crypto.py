@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import struct
-import sys
 
 from .passphrase import get_passphrase
 
@@ -220,3 +219,62 @@ def decrypt_file(
         sha256_hex=digest.hexdigest(),
         size_bytes=size_bytes,
     )
+
+
+def verify_passphrase_for_file(
+    *,
+    input_path: Path,
+    passphrase: str,
+    aad_context: dict[str, str],
+) -> bool:
+    """Verify passphrase by authenticating ciphertext without writing plaintext."""
+    try:
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    except Exception as exc:
+        raise RuntimeError(
+            "cryptography is required for encryption; add dependency and install it"
+        ) from exc
+
+    header, header_size = _read_header(input_path)
+    total_size = input_path.stat().st_size
+    if total_size < header_size + 16:
+        raise ValueError("encrypted payload is too short")
+
+    aad = json.dumps(aad_context, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    expected_aad_hash = str(header.get("aad_sha256", ""))
+    if sha256(aad).hexdigest() != expected_aad_hash:
+        raise ValueError("aad mismatch for encrypted payload")
+
+    kdf = header.get("kdf", {})
+    if not isinstance(kdf, dict):
+        raise ValueError("invalid kdf header")
+    salt = b64decode(str(kdf.get("salt_b64", "")).encode("ascii"))
+    n = int(kdf.get("n", KDF_N))
+    r = int(kdf.get("r", KDF_R))
+    p = int(kdf.get("p", KDF_P))
+    key = _derive_key(passphrase, salt, n=n, r=r, p=p)
+
+    nonce = b64decode(str(header.get("nonce_b64", "")).encode("ascii"))
+    if len(nonce) != NONCE_LEN:
+        raise ValueError("invalid nonce length")
+
+    tag_offset = total_size - 16
+    with input_path.open("rb") as src:
+        src.seek(tag_offset)
+        tag = src.read(16)
+
+    decryptor = Cipher(algorithms.AES(key), modes.GCM(nonce, tag)).decryptor()
+    decryptor.authenticate_additional_data(aad)
+
+    remaining = tag_offset - header_size
+    with input_path.open("rb") as src:
+        src.seek(header_size)
+        while remaining > 0:
+            take = min(CHUNK_SIZE, remaining)
+            chunk = src.read(take)
+            if not chunk:
+                raise ValueError("unexpected EOF while reading ciphertext")
+            remaining -= len(chunk)
+            decryptor.update(chunk)
+    decryptor.finalize()
+    return True

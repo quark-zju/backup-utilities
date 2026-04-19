@@ -4,7 +4,7 @@ from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
 
-from .crypto import decrypt_file
+from .crypto import decrypt_file, verify_passphrase_for_file
 from .passphrase import clear_cached_passphrase, get_passphrase, prompt_new_passphrase
 from .storage import metadata_path, read_json
 
@@ -56,3 +56,44 @@ def decrypt_unit_payload(root: Path, unit_id: str, out: Path) -> int:
         )
     print(f"decrypted to: {out}")
     return 0
+
+
+def verify_unit_passphrase(root: Path, unit_id: str, passphrase: str) -> str:
+    """Return verification note for one unit using current passphrase.
+
+    Returns one of: "ok", "mismatch", "plain", "error".
+    """
+    meta_path = metadata_path(root, unit_id)
+    if not meta_path.exists():
+        return "error"
+
+    meta = read_json(meta_path)
+    payload_info = meta.get("payload", {})
+    encrypted = bool(payload_info.get("encrypted", False))
+    if not encrypted:
+        return "plain"
+
+    payload_rel = str(payload_info.get("path", ""))
+    if not payload_rel:
+        return "error"
+    payload_path = root / payload_rel
+    if not payload_path.exists():
+        return "error"
+
+    aad_context = {
+        "unit_id": unit_id,
+        "snapshot_time": str(meta.get("snapshot_time", "")),
+        "payload_name": Path(payload_rel).name,
+    }
+
+    try:
+        verify_passphrase_for_file(
+            input_path=payload_path,
+            passphrase=passphrase,
+            aad_context=aad_context,
+        )
+    except InvalidTag:
+        return "mismatch"
+    except Exception:
+        return "error"
+    return "ok"

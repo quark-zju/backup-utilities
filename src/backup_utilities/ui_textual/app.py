@@ -27,6 +27,7 @@ from ..passphrase import (
     validate_new_passphrase,
 )
 from ..protocols import default_registry
+from ..recovery import verify_unit_passphrase
 from ..runner import run_backup
 from ..selectors import (
     select_add,
@@ -99,6 +100,7 @@ class BackupTextualApp(App[None]):
         Binding("e", "encrypt_selected", "Encrypt"),
         Binding("d", "decrypt_selected", "Decrypt"),
         Binding("v", "toggle_exclude_selected", "Toggle Exclude"),
+        Binding("p", "check_passphrase_selected", "Check Pass"),
         Binding("x", "remove_selected", "Remove"),
         Binding("m", "add_manual", "Add Manual"),
         Binding("f", "discover_add", "Discover Add"),
@@ -116,6 +118,7 @@ class BackupTextualApp(App[None]):
             queue.Queue()
         )
         self._backup_status: dict[str, str] = {}
+        self._passphrase_check_notes: dict[str, str] = {}
         self._backup_worker_stop = threading.Event()
         self._backup_worker = threading.Thread(
             target=self._backup_worker_main,
@@ -204,11 +207,14 @@ class BackupTextualApp(App[None]):
         marker = "x" if unit_id in self._state.selected_ids else ""
         excluded = "x" if row.excluded else ""
         runtime_status = self._backup_status.get(unit_id)
+        passphrase_note = self._passphrase_check_notes.get(unit_id)
         unit_label = row.unit_id
         if runtime_status == "queued":
             unit_label = f"{unit_label} (queued)"
         elif runtime_status == "backing_up":
             unit_label = f"{unit_label} (backing up)"
+        if passphrase_note:
+            unit_label = f"{unit_label} ({passphrase_note})"
         return (
             marker,
             excluded,
@@ -236,6 +242,7 @@ class BackupTextualApp(App[None]):
             self._state.all_rows[unit_id] = latest_row
         elif unit_id in self._state.all_rows:
             del self._state.all_rows[unit_id]
+            self._passphrase_check_notes.pop(unit_id, None)
 
     def _render_status(self, message: str | None = None) -> None:
         status = self.query_one("#status", Static)
@@ -477,6 +484,12 @@ class BackupTextualApp(App[None]):
         keep_id = self._state.focused_id or self._current_unit_id()
         rows = collect_unit_rows(self._root)
         self._state.reload_rows(rows)
+        known = set(self._state.all_rows)
+        self._passphrase_check_notes = {
+            unit_id: note
+            for unit_id, note in self._passphrase_check_notes.items()
+            if unit_id in known
+        }
         self._render_table(preferred_unit_id=keep_id)
 
     def action_toggle_row(self) -> None:
@@ -617,6 +630,47 @@ class BackupTextualApp(App[None]):
         self._render_status(f"decrypt applied={applied} skipped={skipped}")
         self._log(f"decrypt applied={applied} skipped={skipped}")
 
+    def action_check_passphrase_selected(self) -> None:
+        selected = self._operation_target_ids()
+        if not selected:
+            self._render_status("no selected/focused units")
+            return
+
+        try:
+            passphrase = get_passphrase(allow_prompt=False)
+        except Exception:
+            self._render_status("passphrase unavailable; press Ctrl+E to set one")
+            return
+
+        ok = 0
+        mismatch = 0
+        plain = 0
+        error = 0
+        for unit_id in selected:
+            result = verify_unit_passphrase(self._root, unit_id, passphrase)
+            if result == "ok":
+                ok += 1
+                self._passphrase_check_notes[unit_id] = "passphrase ok"
+            elif result == "mismatch":
+                mismatch += 1
+                self._passphrase_check_notes[unit_id] = "mismatch"
+            elif result == "plain":
+                plain += 1
+                self._passphrase_check_notes[unit_id] = "plain"
+            else:
+                error += 1
+                self._passphrase_check_notes[unit_id] = "error"
+
+        self._state.selected_ids.clear()
+        keep_id = self._state.focused_id or self._current_unit_id()
+        self._render_table(preferred_unit_id=keep_id)
+        self._render_status(
+            f"passphrase check ok={ok} mismatch={mismatch} plain={plain} error={error}"
+        )
+        self._log(
+            f"passphrase check ok={ok} mismatch={mismatch} plain={plain} error={error}"
+        )
+
     def action_remove_selected(self) -> None:
         self.run_worker(self._remove_selected_flow(), thread=False, exclusive=True)
 
@@ -668,7 +722,9 @@ class BackupTextualApp(App[None]):
         self._render_status(
             f"exclude toggled: excluded={excluded_now} unexcluded={unexcluded_now}"
         )
-        self._log(f"exclude toggled excluded={excluded_now} unexcluded={unexcluded_now}")
+        self._log(
+            f"exclude toggled excluded={excluded_now} unexcluded={unexcluded_now}"
+        )
 
     def action_add_manual(self) -> None:
         self.run_worker(self._add_manual_flow(), thread=False, exclusive=True)

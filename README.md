@@ -105,6 +105,7 @@ b      对选中项串行执行 backup
 e      对选中项执行 force encrypt（已是 encrypt 跳过）
 d      对选中项执行 force decrypt（已是 decrypt 跳过）
 v      对选中项执行 toggle exclude（已 exclude 则取消）
+p      对选中项验证当前口令（不解密落盘）
 x      从 selected 中移除（带确认）
 m      手动添加 unit
 f      discover 后批量添加
@@ -115,6 +116,7 @@ q      退出
 
 说明：当没有勾选任何项时，上述批量操作会自动作用于当前高亮行（单选语义）。
 说明：可用鼠标点击表头进行排序；再次点击同一列表头可切换升序/降序。
+说明：口令验证结果会显示在 Unit ID 后括号中，例如 `(passphrase ok)` 或 `(mismatch)`。
 
 ### 8. 搜索语法（MVP）
 
