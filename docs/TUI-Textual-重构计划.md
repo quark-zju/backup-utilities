@@ -1,4 +1,4 @@
-# TUI Textual 重构计划（草案）
+# TUI Textual 重构计划（已确认）
 
 ## 1. 背景与目标
 
@@ -15,7 +15,7 @@
 ## 2. 产品范围（MVP）
 
 MVP 功能：
-- 搜索框：按 `unit_id` 子串过滤列表
+- 搜索框：支持“自由文本 + 冒号条件”混合查询（见第 3.1 节）
 - 列表（table）：显示
   - `Unit ID`
   - `Encrypt Policy`（auto/forced-encrypt/forced-decrypt）
@@ -37,7 +37,6 @@ MVP 功能：
   - `Discover units`（先支持 github）
 
 非 MVP（后续）：
-- 多条件过滤（协议、加密状态、更新时间范围）
 - 列排序/自定义列
 - 多任务并发调度面板
 
@@ -54,6 +53,30 @@ MVP 功能：
 关键提示文案：
 - 当过滤导致有隐藏选中项：
   - `当前已选 12 项，其中 7 项未显示（受过滤条件影响）`
+
+### 3.1 搜索语法（MVP）
+
+搜索框支持“空格分词，AND 语义”：
+- 普通词：按 `unit_id` 子串匹配（不区分大小写）
+  - 例：`github/foo`
+- 冒号条件词（首版）：
+  - `mtime:<op><date>`：按“上次备份时间（Last Snapshot Time）”过滤
+  - `ctime:<op><date>`：按“上次检查时间（Last Verify Time）”过滤
+
+运算符 `<op>`：
+- `>`、`>=`、`<`、`<=`、`=`、`!=`
+
+日期输入（MVP 统一按本地时区解析到日）：
+- `YYYY-M-D`（如 `2026-1-1`）
+- `YYYY-MM-DD`（如 `2026-01-01`）
+
+示例：
+- `github mtime:>2026-1-1`
+- `private-repo ctime:>=2026-04-01`
+- `mtime:>=2026-01-01 ctime:<2026-06-01`
+
+异常处理：
+- 语法错误时不崩溃，状态栏显示解析错误提示，并保持上一次有效过滤结果。
 
 ---
 
@@ -128,8 +151,7 @@ MVP 功能：
 - 长期维护成本低于继续叠加 `whiptail`
 
 兼容策略：
-- 短期保留 `whiptail` 版 `backup tui`（例如改名为 `backup tui-legacy`）
-- 新版入口可暂命名 `backup tui2` 或直接替换 `backup tui`（待确认）
+- 直接移除 legacy `whiptail` TUI，不保留并行入口（Git 历史可追溯）。
 
 ---
 
@@ -142,6 +164,7 @@ Phase A：基础框架
 Phase B：列表与选择
 - 加载 units
 - 搜索过滤
+- 冒号条件搜索（`mtime` / `ctime`）
 - 持久选择语义（含隐藏选中提示）
 
 Phase C：批量动作
@@ -152,9 +175,9 @@ Phase D：新增单元
 - 手动添加
 - discover + 批量添加
 
-Phase E：收尾
+Phase E：收尾与切换
 - 文档、快捷键帮助、异常提示统一
-- 决定 legacy 入口保留策略
+- `backup tui` 直接切换到 Textual 版本
 
 ---
 
@@ -163,45 +186,36 @@ Phase E：收尾
 手工场景：
 - 空列表、少量列表、大量列表（>500）
 - 过滤前后选择保持
+- `mtime` / `ctime` 条件搜索正确性与错误提示
 - 批量动作跳过逻辑正确（encrypt/decrypt）
 - remove 二次确认
 - discover 失败/超时错误提示
 
 自动化建议：
 - `state.py` 的纯逻辑单元测试（过滤、选择、派生统计）
+- `query` 解析测试（运算符、日期格式、错误输入）
 - `actions.py` 的业务调用测试（mock core）
 
 ---
 
-## 10. 待确认决策（请你拍板）
+## 10. 已确认决策（冻结）
 
 1. 命令入口策略：
-- A. `backup tui` 直接切换到 Textual（推荐）
-- B. 新增 `backup tui2`，旧版保留
+- `backup tui` 直接切换到 Textual。
 
 2. 列定义（MVP）：
-- A. 先用本文 5 列
-- B. 增加 `Protocol` 与 `Last Verify Status`
+- 使用当前 5 列（`Unit ID` / `Encrypt Policy` / `Last Snapshot Time` / `Payload Size` / `Last Verify Time`）。
 
 3. remove 语义：
-- A. 仅从 selected 中移除（当前语义）
-- B. 额外支持删除本地备份文件（高风险，不建议 MVP）
+- 仅从 selected 中移除，不删除本地备份文件。
 
 4. 批量 backup 执行模式：
-- A. 串行（推荐，先稳）
-- B. 并行（更快，但 UI 与错误处理复杂）
+- 串行执行。
 
 5. legacy whiptail：
-- A. 过渡期保留 1~2 个版本
-- B. 直接移除
+- 直接移除，不保留并行版本。
 
----
-
-## 11. 建议默认答案（供快速推进）
-
-- 入口：A（直接切换 `backup tui`）
-- 列：A（先 5 列）
-- remove：A（仅从 selected 移除）
-- backup 执行：A（串行）
-- legacy：A（短期保留）
-
+6. 搜索能力（新增确认）：
+- 支持 Gmail 风格冒号条件搜索，MVP 至少包含：
+  - `mtime:<op><date>`（上次备份时间）
+  - `ctime:<op><date>`（上次检查时间）
