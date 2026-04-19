@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 import traceback
 
@@ -303,10 +304,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
+def tui_main() -> int:
     initialize_from_env()
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(["tui"] + sys.argv[1:])
     root = _resolve_root_if_available(args)
     label = _command_label(args)
     if root is not None:

@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 backup = "backup_utilities.cli:main"
+tui = "backup_utilities.cli:tui_main"
 
 [dependency-groups]
 dev = [
