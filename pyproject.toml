@@ -18,5 +18,10 @@ dependencies = [
 [project.scripts]
 backup = "backup_utilities.cli:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/backup_utilities"]
