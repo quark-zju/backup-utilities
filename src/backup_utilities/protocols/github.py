@@ -6,8 +6,12 @@ import json
 from pathlib import Path
 import re
 import subprocess
+from typing import TYPE_CHECKING
 
 from .base import BackupProtocol, DiscoveredUnit, ExportResult, FingerprintResult
+
+if TYPE_CHECKING:
+    from ..config import Config
 
 
 @dataclass(slots=True)
@@ -49,6 +53,16 @@ class GithubProtocol(BackupProtocol):
 
     def can_handle(self, unit_id: str) -> bool:
         return unit_id.startswith("github/")
+
+    def should_encrypt_auto(
+        self, *, protocol_metadata: dict[str, object], cfg: Config
+    ) -> bool | None:
+        if (
+            bool(protocol_metadata.get("private", False))
+            and cfg.github_default_private_encrypt
+        ):
+            return True
+        return None
 
     def discover(self, **kwargs: object) -> list[DiscoveredUnit]:
         user_value = kwargs.get("user")

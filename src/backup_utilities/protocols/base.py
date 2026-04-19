@@ -3,6 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..config import Config
 
 
 @dataclass(slots=True)
@@ -42,3 +46,14 @@ class BackupProtocol(ABC):
     @abstractmethod
     def export_snapshot(self, unit_id: str, staging_dir: Path) -> ExportResult:
         raise NotImplementedError
+
+    def should_encrypt_auto(
+        self, *, protocol_metadata: dict[str, object], cfg: Config
+    ) -> bool | None:
+        """Protocol-specific auto encryption suggestion.
+
+        Return:
+        - True/False to explicitly decide encryption for auto policy.
+        - None to defer to global default_encrypt.
+        """
+        return None

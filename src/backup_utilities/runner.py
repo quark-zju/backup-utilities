@@ -35,7 +35,7 @@ def _should_encrypt(
     *,
     unit_id: str,
     cfg: Config,
-    protocol_name: str,
+    protocol,
     protocol_metadata: dict[str, object],
 ) -> bool:
     if unit_id in cfg.unit_encrypt:
@@ -43,12 +43,12 @@ def _should_encrypt(
     if unit_id in cfg.unit_decrypt:
         return False
 
-    if (
-        protocol_name == "github"
-        and bool(protocol_metadata.get("private", False))
-        and cfg.github_default_private_encrypt
-    ):
-        return True
+    protocol_default = protocol.should_encrypt_auto(
+        protocol_metadata=protocol_metadata,
+        cfg=cfg,
+    )
+    if protocol_default is not None:
+        return protocol_default
     return cfg.default_encrypt
 
 
@@ -125,7 +125,7 @@ def run_backup(
                 encrypt = _should_encrypt(
                     unit_id=unit_id,
                     cfg=cfg,
-                    protocol_name=protocol.name,
+                    protocol=protocol,
                     protocol_metadata=fingerprint.protocol_metadata,
                 )
                 append_log(

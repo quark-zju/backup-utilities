@@ -7,8 +7,12 @@ import os
 from pathlib import Path
 import re
 from typing import Any
+from typing import TYPE_CHECKING
 
 from .base import BackupProtocol, DiscoveredUnit, ExportResult, FingerprintResult
+
+if TYPE_CHECKING:
+    from ..config import Config
 
 _FOLDER_MIME = "application/vnd.google-apps.folder"
 _SHORTCUT_MIME = "application/vnd.google-apps.shortcut"
@@ -132,6 +136,12 @@ class GoogleDriveProtocol(BackupProtocol):
 
     def can_handle(self, unit_id: str) -> bool:
         return unit_id.startswith("gdrive/")
+
+    def should_encrypt_auto(
+        self, *, protocol_metadata: dict[str, object], cfg: Config
+    ) -> bool | None:
+        # Google Drive data defaults to encrypted payloads under auto policy.
+        return True
 
     def discover(self, **kwargs: object) -> list[DiscoveredUnit]:
         limit = int(kwargs.get("limit", 1000))
