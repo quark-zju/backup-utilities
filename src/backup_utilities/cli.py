@@ -13,7 +13,13 @@ from .passphrase import initialize_from_env
 from .protocols import default_registry
 from .recovery import decrypt_unit_payload
 from .runner import run_backup, verify_units
-from .selectors import select_add, select_decrypt, select_encrypt, select_remove
+from .selectors import (
+    select_add,
+    select_decrypt,
+    select_encrypt,
+    select_exclude,
+    select_remove,
+)
 
 
 def _resolve_root(args: argparse.Namespace) -> Path:
@@ -88,6 +94,13 @@ def _cmd_select_remove(args: argparse.Namespace) -> int:
     root = _resolve_root(args)
     select_remove(root, args.unit_id)
     print(f"excluded: {args.unit_id}")
+    return 0
+
+
+def _cmd_select_exclude(args: argparse.Namespace) -> int:
+    root = _resolve_root(args)
+    select_exclude(root, args.unit_id)
+    print(f"excluded (keep include): {args.unit_id}")
     return 0
 
 
@@ -177,6 +190,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_select_remove.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_remove.set_defaults(func=_cmd_select_remove)
+
+    p_select_exclude = select_subparsers.add_parser(
+        "exclude", help="Add unit to exclude list without changing include list"
+    )
+    p_select_exclude.add_argument(
+        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+    )
+    p_select_exclude.add_argument("unit_id", help="Unit id like github/owner/repo")
+    p_select_exclude.set_defaults(func=_cmd_select_exclude)
 
     p_select_encrypt = select_subparsers.add_parser(
         "encrypt", help="Force unit encryption"

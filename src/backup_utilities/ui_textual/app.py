@@ -27,7 +27,13 @@ from ..passphrase import (
 )
 from ..protocols import default_registry
 from ..runner import run_backup
-from ..selectors import select_add, select_decrypt, select_encrypt, select_remove
+from ..selectors import (
+    select_add,
+    select_decrypt,
+    select_encrypt,
+    select_exclude,
+    select_remove,
+)
 from ..units import collect_unit_rows
 from .screens import (
     ConfirmScreen,
@@ -89,6 +95,7 @@ class BackupTextualApp(App[None]):
         Binding("b", "backup_selected", "Backup"),
         Binding("e", "encrypt_selected", "Encrypt"),
         Binding("d", "decrypt_selected", "Decrypt"),
+        Binding("v", "exclude_selected", "Exclude"),
         Binding("x", "remove_selected", "Remove"),
         Binding("m", "add_manual", "Add Manual"),
         Binding("f", "discover_add", "Discover Add"),
@@ -545,6 +552,29 @@ class BackupTextualApp(App[None]):
         self.action_reload_units()
         self._render_status(f"removed units={len(selected)}")
         self._log(f"removed units={len(selected)}")
+
+    def action_exclude_selected(self) -> None:
+        selected = self._selected_ids()
+        if not selected:
+            self._render_status("no selected units")
+            return
+
+        applied = 0
+        skipped = 0
+        cfg = load_config(self._root)
+        excluded = set(cfg.unit_exclude)
+        for unit_id in selected:
+            if unit_id in excluded:
+                skipped += 1
+                continue
+            select_exclude(self._root, unit_id)
+            applied += 1
+            excluded.add(unit_id)
+
+        self._state.selected_ids.clear()
+        self.action_reload_units()
+        self._render_status(f"exclude applied={applied} skipped={skipped}")
+        self._log(f"exclude applied={applied} skipped={skipped}")
 
     def action_add_manual(self) -> None:
         self.run_worker(self._add_manual_flow(), thread=False, exclusive=True)
