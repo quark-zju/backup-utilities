@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
-
-import pytest
 
 from backup_utilities.config import Config, write_config
 from backup_utilities.layout import init_root
@@ -21,65 +20,73 @@ def _make_root(tmp_path: Path) -> Path:
     return root
 
 
-@pytest.mark.asyncio
-async def test_search_enter_moves_focus_to_table(tmp_path: Path) -> None:
-    app = BackupTextualApp(_make_root(tmp_path))
+def test_search_enter_moves_focus_to_table(tmp_path: Path) -> None:
+    async def _run() -> None:
+        app = BackupTextualApp(_make_root(tmp_path))
 
-    async with app.run_test() as pilot:
-        app.action_focus_search()
-        await pilot.pause()
+        async with app.run_test() as pilot:
+            app.action_focus_search()
+            await pilot.pause()
 
-        await pilot.press("enter")
-        await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
 
-        assert app.query_one("#units_table").has_focus
+            assert app.query_one("#units_table").has_focus
 
-
-@pytest.mark.asyncio
-async def test_search_escape_clears_text_before_switching_focus(tmp_path: Path) -> None:
-    app = BackupTextualApp(_make_root(tmp_path))
-
-    async with app.run_test() as pilot:
-        search = app.query_one("#search")
-        app.action_focus_search()
-        search.value = "demo"
-        await pilot.pause()
-
-        await pilot.press("escape")
-        await pilot.pause()
-
-        assert search.has_focus
-        assert search.value == ""
-
-        await pilot.press("escape")
-        await pilot.pause()
-
-        assert app.query_one("#units_table").has_focus
+    asyncio.run(_run())
 
 
-@pytest.mark.asyncio
-async def test_search_escape_switches_focus_when_empty(tmp_path: Path) -> None:
-    app = BackupTextualApp(_make_root(tmp_path))
+def test_search_escape_clears_text_before_switching_focus(tmp_path: Path) -> None:
+    async def _run() -> None:
+        app = BackupTextualApp(_make_root(tmp_path))
 
-    async with app.run_test() as pilot:
-        app.action_focus_search()
-        await pilot.pause()
+        async with app.run_test() as pilot:
+            search = app.query_one("#search")
+            app.action_focus_search()
+            search.value = "demo"
+            await pilot.pause()
 
-        await pilot.press("escape")
-        await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
 
-        assert app.query_one("#units_table").has_focus
+            assert search.has_focus
+            assert search.value == ""
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert app.query_one("#units_table").has_focus
+
+    asyncio.run(_run())
 
 
-@pytest.mark.asyncio
-async def test_table_escape_returns_focus_to_search(tmp_path: Path) -> None:
-    app = BackupTextualApp(_make_root(tmp_path))
+def test_search_escape_switches_focus_when_empty(tmp_path: Path) -> None:
+    async def _run() -> None:
+        app = BackupTextualApp(_make_root(tmp_path))
 
-    async with app.run_test() as pilot:
-        app.action_focus_table()
-        await pilot.pause()
+        async with app.run_test() as pilot:
+            app.action_focus_search()
+            await pilot.pause()
 
-        await pilot.press("escape")
-        await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
 
-        assert app.query_one("#search").has_focus
+            assert app.query_one("#units_table").has_focus
+
+    asyncio.run(_run())
+
+
+def test_table_escape_returns_focus_to_search(tmp_path: Path) -> None:
+    async def _run() -> None:
+        app = BackupTextualApp(_make_root(tmp_path))
+
+        async with app.run_test() as pilot:
+            app.action_focus_table()
+            await pilot.pause()
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert app.query_one("#search").has_focus
+
+    asyncio.run(_run())
