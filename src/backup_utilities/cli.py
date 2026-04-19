@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import traceback
 
 from .config import load_config
 from .discovery import discover_units, format_discovered
 from .layout import init_root, load_index
+from .logging_utils import append_log
 from .protocols import default_registry
 from .recovery import decrypt_unit_payload
 from .runner import run_backup, verify_units
@@ -18,6 +20,25 @@ def _resolve_root(args: argparse.Namespace) -> Path:
     if not root_raw:
         raise ValueError("backup root is required: pass --root or set BACKUP_ROOT")
     return Path(root_raw).resolve()
+
+
+def _resolve_root_if_available(args: argparse.Namespace) -> Path | None:
+    if hasattr(args, "root"):
+        root_raw = args.root or os.environ.get("BACKUP_ROOT")
+        if root_raw:
+            return Path(root_raw).resolve()
+    return None
+
+
+def _command_label(args: argparse.Namespace) -> str:
+    parts = [str(args.command)]
+    if hasattr(args, "discover_command") and args.discover_command:
+        parts.append(str(args.discover_command))
+    if hasattr(args, "select_command") and args.select_command:
+        parts.append(str(args.select_command))
+    if hasattr(args, "protocol") and args.protocol:
+        parts.append(str(args.protocol))
+    return " ".join(parts)
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
@@ -207,7 +228,21 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    return args.func(args)
+    root = _resolve_root_if_available(args)
+    label = _command_label(args)
+    if root is not None:
+        append_log(root, "cli", f"START {label}")
+    try:
+        code = args.func(args)
+    except Exception as exc:
+        if root is not None:
+            append_log(root, "cli", f"ERROR {label}: {exc}")
+            append_log(root, "cli", traceback.format_exc().strip())
+        raise
+
+    if root is not None:
+        append_log(root, "cli", f"END {label} exit={code}")
+    return code
 
 
 if __name__ == "__main__":

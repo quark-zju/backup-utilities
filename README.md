@@ -125,3 +125,9 @@ mtime:>=2026-01-01 ctime:<2026-06-01
 - GitHub 协议依赖：`gh` CLI（需先 `gh auth login`）
 - 加密实现：`AES-256-GCM + scrypt`（通过 `cryptography`）
 - TUI 依赖：`textual`
+
+## 日志
+
+- CLI 与 TUI 共用同一套日志逻辑，写入 `<BACKUP_ROOT>/logs/`。
+- 日志文件按日期聚合：`YYYY-MM-DD.log`（例如 `2026-04-19.log`）。
+- 每行包含本地时间戳、来源（`cli` / `tui`）与消息。

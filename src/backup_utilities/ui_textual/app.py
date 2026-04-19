@@ -17,6 +17,7 @@ from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from ..config import load_config
 from ..discovery import discover_units
+from ..logging_utils import append_log
 from ..protocols import default_registry
 from ..runner import run_backup
 from ..selectors import select_add, select_decrypt, select_encrypt, select_remove
@@ -119,6 +120,9 @@ class BackupTextualApp(App[None]):
             return
         super()._fatal_error()
 
+    def _log(self, message: str) -> None:
+        append_log(self._root, "tui", message)
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Vertical(id="topbar"):
@@ -144,10 +148,12 @@ class BackupTextualApp(App[None]):
         self.set_interval(0.2, self._drain_backup_events)
         self._backup_worker.start()
         self.action_reload_units()
+        self._log("START tui")
 
     def on_unmount(self) -> None:
         self._backup_worker_stop.set()
         self._backup_queue.put(None)
+        self._log("STOP tui")
 
     def _capture_call(self, fn, *args, **kwargs):
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
@@ -214,6 +220,7 @@ class BackupTextualApp(App[None]):
             if unit_id is None:
                 break
             self._backup_events.put(("start", unit_id, None, None))
+            self._log(f"backup start unit={unit_id}")
             result, out, err = self._capture_call_with_output(
                 run_backup,
                 self._root,
@@ -226,6 +233,10 @@ class BackupTextualApp(App[None]):
             if code != 0:
                 failure_message = self._extract_failure_message(out, err)
             self._backup_events.put(("done", unit_id, code == 0, failure_message))
+            if code == 0:
+                self._log(f"backup done unit={unit_id}")
+            else:
+                self._log(f"backup failed unit={unit_id} reason={failure_message}")
 
     @staticmethod
     def _extract_failure_message(stdout_text: str, stderr_text: str) -> str:
@@ -372,6 +383,7 @@ class BackupTextualApp(App[None]):
             self._backup_status[unit_id] = "queued"
             self._backup_queue.put(unit_id)
             queued_now += 1
+        self._log(f"backup queued count={queued_now} skipped={skipped}")
         self._state.selected_ids.clear()
         self._render_table()
         self._render_status(f"backup queued={queued_now} skipped={skipped}")
@@ -395,6 +407,7 @@ class BackupTextualApp(App[None]):
         self._state.selected_ids.clear()
         self.action_reload_units()
         self._render_status(f"encrypt applied={applied} skipped={skipped}")
+        self._log(f"encrypt applied={applied} skipped={skipped}")
 
     def action_decrypt_selected(self) -> None:
         selected = self._selected_ids()
@@ -415,6 +428,7 @@ class BackupTextualApp(App[None]):
         self._state.selected_ids.clear()
         self.action_reload_units()
         self._render_status(f"decrypt applied={applied} skipped={skipped}")
+        self._log(f"decrypt applied={applied} skipped={skipped}")
 
     async def action_remove_selected(self) -> None:
         selected = self._selected_ids()
@@ -437,6 +451,7 @@ class BackupTextualApp(App[None]):
         self._state.selected_ids.clear()
         self.action_reload_units()
         self._render_status(f"removed units={len(selected)}")
+        self._log(f"removed units={len(selected)}")
 
     async def action_add_manual(self) -> None:
         unit_id = await self.push_screen_wait(
@@ -455,6 +470,7 @@ class BackupTextualApp(App[None]):
         self._state.selected_ids.add(unit_id)
         self._render_table(preferred_unit_id=unit_id)
         self._render_status(f"added unit={unit_id}")
+        self._log(f"added unit={unit_id}")
 
     async def action_discover_add(self) -> None:
         protocol = "github"
@@ -515,6 +531,7 @@ class BackupTextualApp(App[None]):
 
         self.action_reload_units()
         self._render_status(f"discover added units={len(chosen)}")
+        self._log(f"discover add units={len(chosen)}")
 
 
 def run_tui(root: Path) -> int:
