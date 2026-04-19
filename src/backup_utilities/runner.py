@@ -37,13 +37,19 @@ def run_backup(
 
     index = load_index(root)
     changed = 0
+    failed = 0
 
     for unit_id in units:
         protocol = registry.protocol_for_unit(unit_id)
         unit_meta_path = metadata_path(root, unit_id)
         prev = read_json(unit_meta_path) if unit_meta_path.exists() else None
 
-        fingerprint = protocol.compute_fingerprint(unit_id)
+        try:
+            fingerprint = protocol.compute_fingerprint(unit_id)
+        except Exception as exc:
+            print(f"failed fingerprint: {unit_id}: {exc}")
+            failed += 1
+            continue
         prev_fp = str(prev.get("source_fingerprint")) if prev else None
 
         if prev_fp == fingerprint.fingerprint:
@@ -55,47 +61,52 @@ def run_backup(
         if dry_run:
             continue
 
-        with tempfile.TemporaryDirectory(prefix="backup-unit-") as tmp:
-            staging = Path(tmp)
-            exported = protocol.export_snapshot(unit_id, staging)
-            target_dir = unit_dir(root, unit_id)
-            target_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with tempfile.TemporaryDirectory(prefix="backup-unit-") as tmp:
+                staging = Path(tmp)
+                exported = protocol.export_snapshot(unit_id, staging)
+                target_dir = unit_dir(root, unit_id)
+                target_dir.mkdir(parents=True, exist_ok=True)
 
-            payload_tmp = payload_path(root, unit_id).with_suffix(".tar.zst.tmp")
-            create_tar_zstd(exported.source_path, payload_tmp)
-            digest = sha256_file(payload_tmp)
-            size_bytes = payload_tmp.stat().st_size
+                final_payload = payload_path(root, unit_id)
+                payload_tmp = final_payload.with_name(f"{final_payload.name}.tmp")
+                create_tar_zstd(exported.source_path, payload_tmp)
+                digest = sha256_file(payload_tmp)
+                size_bytes = payload_tmp.stat().st_size
 
-            final_payload = payload_path(root, unit_id)
-            payload_tmp.replace(final_payload)
+                payload_tmp.replace(final_payload)
 
-            metadata = {
-                "unit_id": unit_id,
-                "protocol": protocol.name,
-                "snapshot_time": now_utc(),
-                "source_fingerprint": fingerprint.fingerprint,
-                "payload": {
-                    "path": str(final_payload.relative_to(root)),
-                    "size_bytes": size_bytes,
-                    "sha256": digest,
-                    "compressed": "zstd",
-                    "encrypted": False,
-                },
-                "protocol_metadata": fingerprint.protocol_metadata,
-                "tool_version": "0.1.0",
-            }
-            write_json_atomic(unit_meta_path, metadata)
+                metadata = {
+                    "unit_id": unit_id,
+                    "protocol": protocol.name,
+                    "snapshot_time": now_utc(),
+                    "source_fingerprint": fingerprint.fingerprint,
+                    "payload": {
+                        "path": str(final_payload.relative_to(root)),
+                        "size_bytes": size_bytes,
+                        "sha256": digest,
+                        "compressed": "zstd",
+                        "encrypted": False,
+                    },
+                    "protocol_metadata": fingerprint.protocol_metadata,
+                    "tool_version": "0.1.0",
+                }
+                write_json_atomic(unit_meta_path, metadata)
 
-            index[unit_id] = {
-                "snapshot_time": metadata["snapshot_time"],
-                "source_fingerprint": metadata["source_fingerprint"],
-                "payload_sha256": digest,
-                "payload_size_bytes": size_bytes,
-            }
+                index[unit_id] = {
+                    "snapshot_time": metadata["snapshot_time"],
+                    "source_fingerprint": metadata["source_fingerprint"],
+                    "payload_sha256": digest,
+                    "payload_size_bytes": size_bytes,
+                }
+        except Exception as exc:
+            print(f"failed backup: {unit_id}: {exc}")
+            failed += 1
+            continue
 
     write_json_atomic(root / "state" / "index.json", index)
-    print(f"done. changed units: {changed}")
-    return 0
+    print(f"done. changed units: {changed}, failed units: {failed}")
+    return 1 if failed else 0
 
 
 def verify_units(root: Path, unit: str | None) -> int:
