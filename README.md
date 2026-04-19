@@ -22,5 +22,6 @@ Notes:
 - `backup discover github` can omit `--user` and infer from current `gh` login.
 - Encrypted payload file is `payload.tar.zst.enc`.
 - Encryption uses `AES-256-GCM` with `scrypt` key derivation.
+- Passphrase source: `BACKUP_PASSPHRASE` first; otherwise prompt only on interactive TTY.
 - Metadata remains plaintext by design.
 - TUI requires `whiptail` installed in your system.

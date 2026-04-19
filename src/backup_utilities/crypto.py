@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import struct
 from getpass import getpass
+import sys
 
 KDF_N = 2**15
 KDF_R = 8
@@ -39,7 +40,12 @@ def resolve_passphrase() -> str:
     if env_value:
         return env_value
 
-    # Fallback for interactive runs without env var.
+    if not (sys.stdin.isatty() and sys.stderr.isatty()):
+        raise ValueError(
+            "missing passphrase in non-interactive mode; set BACKUP_PASSPHRASE"
+        )
+
+    # Fallback for interactive TTY runs without env var.
     value = getpass("Backup passphrase: ")
     if not value:
         raise ValueError("empty passphrase")
