@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "backup-utilities"
+version = "0.1.0"
+description = "Unit-based incremental backup tool"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+backup = "backup_utilities.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/backup_utilities"]
