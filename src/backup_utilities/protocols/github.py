@@ -92,16 +92,25 @@ class GithubProtocol(BackupProtocol):
 
     def compute_fingerprint(self, unit_id: str) -> FingerprintResult:
         ident = self._parse_unit_id(unit_id)
-        refs_lines = _run(
-            [
-                "gh",
-                "api",
-                "--paginate",
-                f"repos/{ident.owner}/{ident.repo}/git/refs",
-                "--jq",
-                ".[] | [.ref, .object.sha] | @tsv",
-            ]
-        )
+        empty_repo = False
+        try:
+            refs_lines = _run(
+                [
+                    "gh",
+                    "api",
+                    "--paginate",
+                    f"repos/{ident.owner}/{ident.repo}/git/refs",
+                    "--jq",
+                    ".[] | [.ref, .object.sha] | @tsv",
+                ]
+            )
+        except RuntimeError as exc:
+            message = str(exc)
+            if "Git Repository is empty" in message and "HTTP 409" in message:
+                refs_lines = ""
+                empty_repo = True
+            else:
+                raise
 
         refs: dict[str, str] = {}
         for line in refs_lines.splitlines():
@@ -135,6 +144,7 @@ class GithubProtocol(BackupProtocol):
                 "default_branch": repo_meta.get("default_branch"),
                 "pushed_at": repo_meta.get("pushed_at"),
                 "private": bool(repo_meta.get("private", False)),
+                "empty_repo": empty_repo,
                 "refs": refs,
             },
         )
