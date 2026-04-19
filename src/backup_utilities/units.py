@@ -51,12 +51,17 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
         else:
             policy = "auto"
 
+        policy_display = policy
+        if isinstance(payload, dict) and payload.get("encrypted") is not None:
+            encrypted = bool(payload.get("encrypted"))
+            policy_display = f"{policy} ({'encrypted' if encrypted else 'plain'})"
+
         rows.append(
             UnitRow(
                 unit_id=unit_id,
                 selected=unit_id in cfg.unit_include
                 and unit_id not in cfg.unit_exclude,
-                encrypt_policy=policy,
+                encrypt_policy=policy_display,
                 last_snapshot_time=(
                     str(meta.get("snapshot_time"))
                     if meta.get("snapshot_time")
