@@ -423,11 +423,17 @@ class BackupTextualApp(App[None]):
     def action_toggle_row(self) -> None:
         if self.query_one("#search", Input).has_focus:
             return
+        table = self.query_one("#units_table", DataTable)
+        row_index = table.cursor_row
         unit_id = self._current_unit_id()
         if not unit_id:
             return
         self._state.toggle_selected(unit_id)
         self._update_selection_cell(unit_id)
+        if row_index is not None and row_index + 1 < len(self._state.visible_ids):
+            next_index = row_index + 1
+            table.move_cursor(row=next_index, animate=False, scroll=True)
+            self._state.focused_id = self._state.visible_ids[next_index]
         self._render_status()
 
     def _update_selection_cell(self, unit_id: str) -> None:
