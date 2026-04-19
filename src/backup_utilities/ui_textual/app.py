@@ -547,13 +547,23 @@ class BackupTextualApp(App[None]):
 
     def _selected_need_passphrase(self, selected: list[str]) -> bool:
         cfg = load_config(self._root)
-        if cfg.default_encrypt:
-            return True
         for unit_id in selected:
+            if unit_id in cfg.unit_decrypt:
+                continue
+            if unit_id in cfg.unit_encrypt:
+                return True
+
+            # default_encrypt applies only when unit is not forced-decrypt.
+            if cfg.default_encrypt:
+                return True
+
             row = self._state.all_rows.get(unit_id)
             if row is None:
                 continue
-            if row.encrypt_policy != "forced-decrypt":
+            # encrypt_policy may include display suffix like "(encrypted)".
+            if row.encrypt_policy.startswith("forced-decrypt"):
+                continue
+            if row.encrypt_policy.startswith("forced-encrypt"):
                 return True
         return False
 
