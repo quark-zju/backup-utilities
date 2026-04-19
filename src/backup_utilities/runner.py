@@ -7,6 +7,7 @@ from .archive import create_tar_zstd, sha256_file
 from .config import Config, load_config
 from .crypto import encrypt_file
 from .layout import load_index
+from .logging_utils import append_log
 from .passphrase import get_passphrase
 from .protocols import ProtocolRegistry
 from .storage import (
@@ -74,12 +75,22 @@ def run_backup(
             fingerprint = protocol.compute_fingerprint(unit_id)
         except Exception as exc:
             print(f"failed fingerprint: {unit_id}: {exc}")
+            append_log(root, "runner", f"fingerprint failed unit={unit_id} error={exc}")
             failed += 1
             continue
         prev_fp = str(prev.get("source_fingerprint")) if prev else None
+        append_log(
+            root,
+            "runner",
+            (
+                f"fingerprint check unit={unit_id} "
+                f"prev={prev_fp or '-'} current={fingerprint.fingerprint}"
+            ),
+        )
 
         if prev_fp == fingerprint.fingerprint:
             print(f"skip unchanged: {unit_id}")
+            append_log(root, "runner", f"decision skip unit={unit_id} reason=match")
             if prev is not None:
                 prev["check"] = {
                     "last_check_time": check_time,
@@ -90,7 +101,13 @@ def run_backup(
 
         changed += 1
         print(f"backup: {unit_id}")
+        append_log(
+            root,
+            "runner",
+            f"decision backup unit={unit_id} reason=mismatch_or_first_snapshot",
+        )
         if dry_run:
+            append_log(root, "runner", f"dry-run skip-write unit={unit_id}")
             continue
 
         archive_tmp: Path | None = None
@@ -110,6 +127,9 @@ def run_backup(
                     cfg=cfg,
                     protocol_name=protocol.name,
                     protocol_metadata=fingerprint.protocol_metadata,
+                )
+                append_log(
+                    root, "runner", f"payload encrypt unit={unit_id} value={encrypt}"
                 )
 
                 encryption_metadata: dict[str, object] | None = None
@@ -161,6 +181,7 @@ def run_backup(
                 if encryption_metadata is not None:
                     metadata["encryption"] = encryption_metadata
                 write_json_atomic(unit_meta_path, metadata)
+                append_log(root, "runner", f"metadata updated unit={unit_id}")
 
                 index[unit_id] = {
                     "snapshot_time": metadata["snapshot_time"],
@@ -172,10 +193,12 @@ def run_backup(
             if archive_tmp is not None:
                 archive_tmp.unlink(missing_ok=True)
             print(f"failed backup: {unit_id}: {exc}")
+            append_log(root, "runner", f"backup failed unit={unit_id} error={exc}")
             failed += 1
             continue
 
     write_json_atomic(root / "state" / "index.json", index)
+    append_log(root, "runner", f"backup summary changed={changed} failed={failed}")
     print(f"done. changed units: {changed}, failed units: {failed}")
     return 1 if failed else 0
 
