@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 
 from .config import load_config
@@ -26,13 +26,13 @@ class Whiptail:
     def __init__(self) -> None:
         if shutil.which("whiptail") is None:
             raise RuntimeError("whiptail is not installed")
+        if not (sys.stdin.isatty() and sys.stderr.isatty()):
+            raise RuntimeError("tui requires an interactive tty terminal")
 
     def _run(self, args: list[str]) -> DialogResult:
-        cmd = " ".join(shlex.quote(x) for x in ["whiptail", *args])
-        cmd = f"{cmd} 3>&1 1>&2 2>&3"
-        res = subprocess.run(
-            cmd, shell=True, check=False, capture_output=True, text=True
-        )
+        # Keep whiptail UI on stderr (attached to terminal), capture result from stdout.
+        cmd = ["whiptail", "--output-fd", "1", *args]
+        res = subprocess.run(cmd, check=False, stdout=subprocess.PIPE, text=True)
         return DialogResult(code=res.returncode, value=res.stdout.strip())
 
     def menu(self, title: str, text: str, options: list[tuple[str, str]]) -> str | None:
