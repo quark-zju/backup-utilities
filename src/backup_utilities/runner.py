@@ -4,10 +4,12 @@ from pathlib import Path
 import tempfile
 
 from .archive import create_tar_zstd, sha256_file
-from .config import load_config
+from .config import Config, load_config
+from .crypto import encrypt_file, resolve_passphrase
 from .layout import load_index
 from .protocols import ProtocolRegistry
 from .storage import (
+    encrypted_payload_path,
     metadata_path,
     now_utc,
     payload_path,
@@ -27,9 +29,31 @@ def _selected_units(root: Path, unit_arg: str | None) -> list[str]:
     return units
 
 
+def _should_encrypt(
+    *,
+    unit_id: str,
+    cfg: Config,
+    protocol_name: str,
+    protocol_metadata: dict[str, object],
+) -> bool:
+    if unit_id in cfg.unit_encrypt:
+        return True
+    if unit_id in cfg.unit_decrypt:
+        return False
+
+    if (
+        protocol_name == "github"
+        and bool(protocol_metadata.get("private", False))
+        and cfg.github_default_private_encrypt
+    ):
+        return True
+    return cfg.default_encrypt
+
+
 def run_backup(
     root: Path, registry: ProtocolRegistry, unit: str | None, dry_run: bool
 ) -> int:
+    cfg = load_config(root)
     units = _selected_units(root, unit)
     if not units:
         print("no selected units")
@@ -38,6 +62,7 @@ def run_backup(
     index = load_index(root)
     changed = 0
     failed = 0
+    passphrase_cache: str | None = None
 
     for unit_id in units:
         protocol = registry.protocol_for_unit(unit_id)
@@ -67,30 +92,64 @@ def run_backup(
                 exported = protocol.export_snapshot(unit_id, staging)
                 target_dir = unit_dir(root, unit_id)
                 target_dir.mkdir(parents=True, exist_ok=True)
+                snapshot_time = now_utc()
 
-                final_payload = payload_path(root, unit_id)
-                payload_tmp = final_payload.with_name(f"{final_payload.name}.tmp")
-                create_tar_zstd(exported.source_path, payload_tmp)
-                digest = sha256_file(payload_tmp)
-                size_bytes = payload_tmp.stat().st_size
+                archive_tmp = target_dir / "payload.tar.zst.tmp"
+                create_tar_zstd(exported.source_path, archive_tmp)
 
-                payload_tmp.replace(final_payload)
+                encrypt = _should_encrypt(
+                    unit_id=unit_id,
+                    cfg=cfg,
+                    protocol_name=protocol.name,
+                    protocol_metadata=fingerprint.protocol_metadata,
+                )
+
+                encryption_metadata: dict[str, object] | None = None
+                if encrypt:
+                    if passphrase_cache is None:
+                        passphrase_cache = resolve_passphrase()
+                    final_payload = encrypted_payload_path(root, unit_id)
+                    encrypted_tmp = final_payload.with_name(f"{final_payload.name}.tmp")
+                    enc = encrypt_file(
+                        input_path=archive_tmp,
+                        output_path=encrypted_tmp,
+                        passphrase=passphrase_cache,
+                        aad_context={
+                            "unit_id": unit_id,
+                            "snapshot_time": snapshot_time,
+                            "payload_name": final_payload.name,
+                        },
+                    )
+                    archive_tmp.unlink(missing_ok=True)
+                    digest = enc.sha256_hex
+                    size_bytes = enc.size_bytes
+                    encryption_metadata = enc.encryption_metadata
+                    encrypted_tmp.replace(final_payload)
+                    payload_path(root, unit_id).unlink(missing_ok=True)
+                else:
+                    final_payload = payload_path(root, unit_id)
+                    digest = sha256_file(archive_tmp)
+                    size_bytes = archive_tmp.stat().st_size
+                    archive_tmp.replace(final_payload)
+                    encrypted_payload_path(root, unit_id).unlink(missing_ok=True)
 
                 metadata = {
                     "unit_id": unit_id,
                     "protocol": protocol.name,
-                    "snapshot_time": now_utc(),
+                    "snapshot_time": snapshot_time,
                     "source_fingerprint": fingerprint.fingerprint,
                     "payload": {
                         "path": str(final_payload.relative_to(root)),
                         "size_bytes": size_bytes,
                         "sha256": digest,
                         "compressed": "zstd",
-                        "encrypted": False,
+                        "encrypted": encrypt,
                     },
                     "protocol_metadata": fingerprint.protocol_metadata,
                     "tool_version": "0.1.0",
                 }
+                if encryption_metadata is not None:
+                    metadata["encryption"] = encryption_metadata
                 write_json_atomic(unit_meta_path, metadata)
 
                 index[unit_id] = {
@@ -119,13 +178,18 @@ def verify_units(root: Path, unit: str | None) -> int:
     failed = 0
     for unit_id in units:
         meta_path = metadata_path(root, unit_id)
-        payload = payload_path(root, unit_id)
-        if not meta_path.exists() or not payload.exists():
+        if not meta_path.exists():
             print(f"missing files: {unit_id}")
             failed += 1
             continue
 
         meta = read_json(meta_path)
+        payload_rel = meta["payload"]["path"]
+        payload = root / str(payload_rel)
+        if not payload.exists():
+            print(f"missing payload: {unit_id}")
+            failed += 1
+            continue
         expected = str(meta["payload"]["sha256"])
         current = sha256_file(payload)
         if expected == current:

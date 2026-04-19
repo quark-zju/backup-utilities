@@ -17,6 +17,10 @@ def payload_path(root: Path, unit_id: str) -> Path:
     return unit_dir(root, unit_id) / "payload.tar.zst"
 
 
+def encrypted_payload_path(root: Path, unit_id: str) -> Path:
+    return unit_dir(root, unit_id) / "payload.tar.zst.enc"
+
+
 def read_json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
