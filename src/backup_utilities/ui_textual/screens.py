@@ -90,7 +90,7 @@ class DiscoverSelectScreen(Screen[list[str] | None]):
         yield Static("Discover Result", id="discover_title")
         yield DataTable(id="discover_table")
         yield Static(
-            "Space: toggle | A: all | N: none | Enter: add | Esc: back",
+            "Space: toggle | A: all | N: none | Enter: confirm add | Esc: cancel/back",
             id="discover_hint",
         )
 
