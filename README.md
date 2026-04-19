@@ -22,7 +22,7 @@ uv run backup tui
 ```
 
 默认备份目录是当前工作目录下的 `./backup`。
-如需指定其他路径，可设置 `BACKUP_PATH`（兼容旧变量 `BACKUP_ROOT`）。
+如需指定其他路径，可设置 `BACKUP_ROOT`（兼容 `BACKUP_PATH`）。
 
 ## Google Drive 首次使用
 

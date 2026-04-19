@@ -33,5 +33,5 @@
 
 ## 日志
 
-- 路径：`<BACKUP_PATH>/logs/YYYY-MM-DD.log`（默认 `./backup/logs/YYYY-MM-DD.log`）
+- 路径：`<BACKUP_ROOT>/logs/YYYY-MM-DD.log`（默认 `./backup/logs/YYYY-MM-DD.log`）
 - 来源标签：`cli` / `tui` / `runner`
