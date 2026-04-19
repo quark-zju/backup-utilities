@@ -8,7 +8,12 @@ version = "0.1.0"
 description = "Unit-based incremental backup tool"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["cryptography>=45.0.0", "textual>=0.75.0"]
+dependencies = [
+    "cryptography>=45.0.0",
+    "textual>=0.75.0",
+    "google-api-python-client>=2.0.0",
+    "google-auth-oauthlib>=1.2.0",
+]
 
 [project.scripts]
 backup = "backup_utilities.cli:main"

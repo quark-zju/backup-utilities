@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .base import BackupProtocol
+from .google_drive import GoogleDriveProtocol
 from .github import GithubProtocol
 
 
@@ -25,4 +26,4 @@ class ProtocolRegistry:
 
 
 def default_registry() -> ProtocolRegistry:
-    return ProtocolRegistry(protocols=[GithubProtocol()])
+    return ProtocolRegistry(protocols=[GithubProtocol(), GoogleDriveProtocol()])
