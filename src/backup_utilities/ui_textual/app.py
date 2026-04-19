@@ -18,7 +18,12 @@ from textual.widgets import DataTable, Footer, Header, Input, Static
 from ..config import load_config
 from ..discovery import discover_units
 from ..logging_utils import append_log
-from ..passphrase import get_passphrase, set_cached_passphrase
+from ..passphrase import (
+    clear_cached_passphrase,
+    get_passphrase,
+    has_passphrase_cached,
+    set_cached_passphrase,
+)
 from ..protocols import default_registry
 from ..runner import run_backup
 from ..selectors import select_add, select_decrypt, select_encrypt, select_remove
@@ -75,6 +80,7 @@ class BackupTextualApp(App[None]):
 
     BINDINGS = [
         Binding("tab", "toggle_focus", "Focus"),
+        Binding("ctrl+p", "clear_passphrase_cache", "Clear Passphrase"),
         Binding("space", "toggle_row", "Toggle"),
         Binding("a", "select_visible", "Select Visible"),
         Binding("n", "unselect_visible", "Unselect Visible"),
@@ -206,7 +212,8 @@ class BackupTextualApp(App[None]):
         chunks = [
             (
                 f"total={total} visible={visible} selected={selected} "
-                f"hidden_selected={hidden} queued={queued} backing_up={backing_up}"
+                f"hidden_selected={hidden} queued={queued} backing_up={backing_up} "
+                f"passphrase_cached={'yes' if has_passphrase_cached() else 'no'}"
             )
         ]
         if self._state.query_error:
@@ -338,6 +345,11 @@ class BackupTextualApp(App[None]):
             self.action_focus_table()
         else:
             self.action_focus_search()
+
+    def action_clear_passphrase_cache(self) -> None:
+        clear_cached_passphrase()
+        self._render_status("passphrase cache cleared")
+        self._log("passphrase cache cleared")
 
     def on_key(self, event: events.Key) -> None:
         search = self.query_one("#search", Input)

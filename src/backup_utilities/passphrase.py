@@ -43,7 +43,16 @@ def set_cached_passphrase(value: str | None) -> None:
 
 
 def clear_cached_passphrase() -> None:
+    global _env_passphrase
     set_cached_passphrase(None)
+    with _lock:
+        _env_passphrase = None
+
+
+def has_passphrase_cached() -> bool:
+    initialize_from_env()
+    with _lock:
+        return bool(_env_passphrase or _cached_passphrase)
 
 
 def _prompt_in_cli(prompt: str) -> str:
