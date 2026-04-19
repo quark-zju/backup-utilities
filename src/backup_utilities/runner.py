@@ -86,6 +86,7 @@ def run_backup(
         if dry_run:
             continue
 
+        archive_tmp: Path | None = None
         try:
             with tempfile.TemporaryDirectory(prefix="backup-unit-") as tmp:
                 staging = Path(tmp)
@@ -159,6 +160,8 @@ def run_backup(
                     "payload_size_bytes": size_bytes,
                 }
         except Exception as exc:
+            if archive_tmp is not None:
+                archive_tmp.unlink(missing_ok=True)
             print(f"failed backup: {unit_id}: {exc}")
             failed += 1
             continue

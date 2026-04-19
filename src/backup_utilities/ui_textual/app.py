@@ -247,7 +247,12 @@ class BackupTextualApp(App[None]):
         if not merged_lines:
             return "unknown failure"
         for line in reversed(merged_lines):
+            if line.startswith("failed backup:"):
+                return line
+        for line in reversed(merged_lines):
             low = line.lower()
+            if line.startswith("done. changed units:"):
+                continue
             if "failed" in low or "error" in low or "mismatch" in low:
                 return line
         return merged_lines[-1]
