@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import traceback
 
-from .config import load_config
+from .config import config_path, load_config
 from .discovery import discover_units, format_discovered
 from .layout import init_root, load_index
 from .logging_utils import append_log
@@ -23,18 +23,31 @@ from .selectors import (
 )
 
 
+def _root_raw_from_args(args: argparse.Namespace) -> str:
+    return (
+        args.root
+        or os.environ.get("BACKUP_PATH")
+        or os.environ.get("BACKUP_ROOT")
+        or str(Path.cwd() / "backup")
+    )
+
+
+def _ensure_initialized_root(root: Path) -> None:
+    cfg_path = config_path(root)
+    index_path = root / "state" / "index.json"
+    if not root.exists() or not cfg_path.exists() or not index_path.exists():
+        init_root(root)
+
+
 def _resolve_root(args: argparse.Namespace) -> Path:
-    root_raw = args.root or os.environ.get("BACKUP_ROOT")
-    if not root_raw:
-        raise ValueError("backup root is required: pass --root or set BACKUP_ROOT")
-    return Path(root_raw).resolve()
+    root = Path(_root_raw_from_args(args)).resolve()
+    _ensure_initialized_root(root)
+    return root
 
 
 def _resolve_root_if_available(args: argparse.Namespace) -> Path | None:
     if hasattr(args, "root"):
-        root_raw = args.root or os.environ.get("BACKUP_ROOT")
-        if root_raw:
-            return Path(root_raw).resolve()
+        return Path(_root_raw_from_args(args)).resolve()
     return None
 
 
@@ -51,7 +64,6 @@ def _command_label(args: argparse.Namespace) -> str:
 
 def _cmd_init(args: argparse.Namespace) -> int:
     root = _resolve_root(args)
-    init_root(root)
     print(f"initialized backup root: {root}")
     return 0
 
@@ -163,17 +175,26 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     p_init = subparsers.add_parser("init", help="Initialize backup root")
-    p_init.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
+    p_init.add_argument(
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
+    )
     p_init.set_defaults(func=_cmd_init)
 
     p_status = subparsers.add_parser("status", help="Show backup status")
-    p_status.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
+    p_status.add_argument(
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
+    )
     p_status.set_defaults(func=_cmd_status)
 
     registry = default_registry()
 
     p_discover = subparsers.add_parser("discover", help="Discover backup units")
-    p_discover.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
+    p_discover.add_argument(
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
+    )
     p_discover.add_argument(
         "protocol", choices=registry.protocol_names(), help="Protocol name"
     )
@@ -187,7 +208,10 @@ def build_parser() -> argparse.ArgumentParser:
     select_subparsers = p_select.add_subparsers(dest="select_command", required=True)
 
     p_select_add = select_subparsers.add_parser("add", help="Add unit to include list")
-    p_select_add.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
+    p_select_add.add_argument(
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
+    )
     p_select_add.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_add.set_defaults(func=_cmd_select_add)
 
@@ -195,7 +219,8 @@ def build_parser() -> argparse.ArgumentParser:
         "remove", help="Move unit to exclude list"
     )
     p_select_remove.add_argument(
-        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
     )
     p_select_remove.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_remove.set_defaults(func=_cmd_select_remove)
@@ -204,7 +229,8 @@ def build_parser() -> argparse.ArgumentParser:
         "exclude", help="Add unit to exclude list without changing include list"
     )
     p_select_exclude.add_argument(
-        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
     )
     p_select_exclude.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_exclude.set_defaults(func=_cmd_select_exclude)
@@ -213,7 +239,8 @@ def build_parser() -> argparse.ArgumentParser:
         "unexclude", help="Remove unit from exclude list"
     )
     p_select_unexclude.add_argument(
-        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
     )
     p_select_unexclude.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_unexclude.set_defaults(func=_cmd_select_unexclude)
@@ -222,7 +249,8 @@ def build_parser() -> argparse.ArgumentParser:
         "encrypt", help="Force unit encryption"
     )
     p_select_encrypt.add_argument(
-        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
     )
     p_select_encrypt.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_encrypt.set_defaults(func=_cmd_select_encrypt)
@@ -231,19 +259,26 @@ def build_parser() -> argparse.ArgumentParser:
         "decrypt", help="Force unit unencrypted payload"
     )
     p_select_decrypt.add_argument(
-        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
     )
     p_select_decrypt.add_argument("unit_id", help="Unit id like github/owner/repo")
     p_select_decrypt.set_defaults(func=_cmd_select_decrypt)
 
     p_run = subparsers.add_parser("run", help="Run backup")
-    p_run.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
+    p_run.add_argument(
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
+    )
     p_run.add_argument("--unit", help="Single selected unit to run")
     p_run.add_argument("--dry-run", action="store_true", help="Only check changes")
     p_run.set_defaults(func=_cmd_run)
 
     p_verify = subparsers.add_parser("verify", help="Verify payload sha256 by metadata")
-    p_verify.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
+    p_verify.add_argument(
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
+    )
     p_verify.add_argument("--unit", help="Single selected unit to verify")
     p_verify.set_defaults(func=_cmd_verify)
 
@@ -251,7 +286,8 @@ def build_parser() -> argparse.ArgumentParser:
         "decrypt-unit", help="Decrypt encrypted payload for one unit"
     )
     p_decrypt_unit.add_argument(
-        "--root", help="Backup root path (fallback: BACKUP_ROOT)"
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
     )
     p_decrypt_unit.add_argument("--unit", required=True, help="Unit id to decrypt")
     p_decrypt_unit.add_argument(
@@ -260,7 +296,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_decrypt_unit.set_defaults(func=_cmd_decrypt_unit)
 
     p_tui = subparsers.add_parser("tui", help="Start Textual TUI")
-    p_tui.add_argument("--root", help="Backup root path (fallback: BACKUP_ROOT)")
+    p_tui.add_argument(
+        "--root",
+        help="Backup root path (fallback: BACKUP_PATH, BACKUP_ROOT, ./backup)",
+    )
     p_tui.set_defaults(func=_cmd_tui)
 
     return parser
