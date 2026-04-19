@@ -14,18 +14,15 @@
 # 1) 安装依赖
 uv sync
 
-# 2) 设置备份根目录
-export BACKUP_ROOT=~/backup
-
-# 3) 初始化
-uv run backup init
-
-# 4) GitHub 登录（如要备份 GitHub）
+# 2) GitHub 登录（如要备份 GitHub）
 gh auth login
 
-# 5) 启动 TUI
+# 3) 启动 TUI
 uv run backup tui
 ```
+
+默认备份目录是当前工作目录下的 `./backup`。  
+如需指定其他路径，可设置 `BACKUP_PATH`（兼容旧变量 `BACKUP_ROOT`）。
 
 建议先在 TUI 里按 `f` 列举可备份 repo，然后执行备份。
 
