@@ -76,11 +76,17 @@ def _fmt_snapshot_date(value: str | None) -> str:
 
 class BackupTextualApp(App[None]):
     CSS = """
+    #main {
+      height: 1fr;
+    }
     #topbar {
       height: 3;
     }
     #search {
       width: 1fr;
+    }
+    #units_table {
+      height: 1fr;
     }
     #status {
       height: 2;
@@ -147,13 +153,14 @@ class BackupTextualApp(App[None]):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
-        with Vertical(id="topbar"):
-            yield Input(
-                placeholder="Search: text, mtime:>2026-1-1, ctime:>=2026-1-1",
-                id="search",
-            )
-        yield DataTable(id="units_table")
-        yield Static("", id="status")
+        with Vertical(id="main"):
+            with Vertical(id="topbar"):
+                yield Input(
+                    placeholder="Search: text, mtime:>2026-1-1, ctime:>=2026-1-1",
+                    id="search",
+                )
+            yield DataTable(id="units_table")
+            yield Static("", id="status")
         yield Footer()
 
     def on_mount(self) -> None:
