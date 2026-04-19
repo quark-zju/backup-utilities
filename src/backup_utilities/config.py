@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import tomllib
+import uuid as _uuid
 
 CONFIG_REL_PATH = Path("config") / "backup_config.toml"
 
 
 @dataclass(slots=True)
 class Config:
+    uuid: str = ""
     compression_level: int = 10
     max_workers: int = 1
     default_encrypt: bool = False
@@ -37,6 +39,7 @@ def write_config(root: Path, cfg: Config) -> None:
     content = "\n".join(
         [
             "[global]",
+            f'uuid = "{cfg.uuid}"',
             f"compression_level = {cfg.compression_level}",
             f"max_workers = {cfg.max_workers}",
             f"default_encrypt = {str(cfg.default_encrypt).lower()}",
@@ -79,7 +82,12 @@ def load_config(root: Path) -> Config:
     protocol_cfg = data.get("protocol", {}).get("github", {})
     units_cfg = data.get("units", {})
 
+    config_uuid = global_cfg.get("uuid", "")
+    if not config_uuid:
+        config_uuid = str(_uuid.uuid4())
+
     return Config(
+        uuid=config_uuid,
         compression_level=int(global_cfg.get("compression_level", 10)),
         max_workers=int(global_cfg.get("max_workers", 1)),
         default_encrypt=bool(global_cfg.get("default_encrypt", False)),
