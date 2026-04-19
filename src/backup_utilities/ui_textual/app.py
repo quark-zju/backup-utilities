@@ -18,6 +18,7 @@ from textual.widgets import DataTable, Footer, Header, Input, Static
 from ..config import load_config
 from ..discovery import discover_units
 from ..logging_utils import append_log
+from ..passphrase import get_passphrase, set_cached_passphrase
 from ..protocols import default_registry
 from ..runner import run_backup
 from ..selectors import select_add, select_decrypt, select_encrypt, select_remove
@@ -372,11 +373,45 @@ class BackupTextualApp(App[None]):
     def _selected_ids(self) -> list[str]:
         return sorted(self._state.selected_ids)
 
-    def action_backup_selected(self) -> None:
+    def _selected_need_passphrase(self, selected: list[str]) -> bool:
+        cfg = load_config(self._root)
+        if cfg.default_encrypt:
+            return True
+        for unit_id in selected:
+            row = self._state.all_rows.get(unit_id)
+            if row is None:
+                continue
+            if row.encrypt_policy != "forced-decrypt":
+                return True
+        return False
+
+    async def action_backup_selected(self) -> None:
         selected = self._selected_ids()
         if not selected:
             self._render_status("no selected units")
             return
+
+        if self._selected_need_passphrase(selected):
+            try:
+                # Use env or cached value if already available.
+                get_passphrase(allow_prompt=False)
+            except Exception:
+                entered = await self.push_screen_wait(
+                    TextPromptScreen(
+                        "Backup Passphrase",
+                        "Passphrase required for encrypted backup:",
+                        "",
+                        password=True,
+                    )
+                )
+                if entered is None:
+                    self._render_status("backup cancelled: passphrase not provided")
+                    return
+                entered = entered.strip()
+                if not entered:
+                    self._render_status("backup cancelled: empty passphrase")
+                    return
+                set_cached_passphrase(entered)
 
         queued_now = 0
         skipped = 0

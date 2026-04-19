@@ -5,8 +5,9 @@ import tempfile
 
 from .archive import create_tar_zstd, sha256_file
 from .config import Config, load_config
-from .crypto import encrypt_file, resolve_passphrase
+from .crypto import encrypt_file
 from .layout import load_index
+from .passphrase import get_passphrase
 from .protocols import ProtocolRegistry
 from .storage import (
     encrypted_payload_path,
@@ -62,7 +63,6 @@ def run_backup(
     index = load_index(root)
     changed = 0
     failed = 0
-    passphrase_cache: str | None = None
 
     for unit_id in units:
         protocol = registry.protocol_for_unit(unit_id)
@@ -107,14 +107,12 @@ def run_backup(
 
                 encryption_metadata: dict[str, object] | None = None
                 if encrypt:
-                    if passphrase_cache is None:
-                        passphrase_cache = resolve_passphrase()
                     final_payload = encrypted_payload_path(root, unit_id)
                     encrypted_tmp = final_payload.with_name(f"{final_payload.name}.tmp")
                     enc = encrypt_file(
                         input_path=archive_tmp,
                         output_path=encrypted_tmp,
-                        passphrase=passphrase_cache,
+                        passphrase=get_passphrase(),
                         aad_context={
                             "unit_id": unit_id,
                             "snapshot_time": snapshot_time,

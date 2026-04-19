@@ -7,8 +7,9 @@ import json
 import os
 from pathlib import Path
 import struct
-from getpass import getpass
 import sys
+
+from .passphrase import get_passphrase
 
 KDF_N = 2**15
 KDF_R = 8
@@ -36,20 +37,8 @@ class DecryptResult:
 
 
 def resolve_passphrase() -> str:
-    env_value = os.environ.get("BACKUP_PASSPHRASE")
-    if env_value:
-        return env_value
-
-    if not (sys.stdin.isatty() and sys.stderr.isatty()):
-        raise ValueError(
-            "missing passphrase in non-interactive mode; set BACKUP_PASSPHRASE"
-        )
-
-    # Fallback for interactive TTY runs without env var.
-    value = getpass("Backup passphrase: ")
-    if not value:
-        raise ValueError("empty passphrase")
-    return value
+    # Backward-compatible wrapper; actual logic is centralized in passphrase.py.
+    return get_passphrase()
 
 
 def _derive_key(passphrase: str, salt: bytes, *, n: int, r: int, p: int) -> bytes:

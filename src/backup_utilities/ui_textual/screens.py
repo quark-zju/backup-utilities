@@ -19,17 +19,20 @@ class DiscoverCandidate:
 class TextPromptScreen(Screen[str | None]):
     BINDINGS = [Binding("escape", "cancel", "Back")]
 
-    def __init__(self, title: str, prompt: str, default: str = "") -> None:
+    def __init__(
+        self, title: str, prompt: str, default: str = "", *, password: bool = False
+    ) -> None:
         super().__init__()
         self._title = title
         self._prompt = prompt
         self._default = default
+        self._password = password
 
     def compose(self) -> ComposeResult:
         with Vertical(id="prompt_root"):
             yield Static(self._title, id="prompt_title")
             yield Static(self._prompt, id="prompt_text")
-            yield Input(value=self._default, id="prompt_input")
+            yield Input(value=self._default, id="prompt_input", password=self._password)
             yield Static("Enter: confirm | Esc: back", id="prompt_hint")
 
     def on_mount(self) -> None:
