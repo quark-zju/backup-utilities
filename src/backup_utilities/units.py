@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import load_config
+from .protocols import default_registry
 from .storage import read_json
 
 
@@ -34,6 +35,7 @@ def _discover_metadata_unit_ids(root: Path) -> set[str]:
 
 def collect_unit_rows(root: Path) -> list[UnitRow]:
     cfg = load_config(root)
+    registry = default_registry()
     known_ids = (
         set(cfg.unit_include)
         | set(cfg.unit_exclude)
@@ -54,7 +56,19 @@ def collect_unit_rows(root: Path) -> list[UnitRow]:
         if isinstance(payload, dict) and isinstance(payload.get("encrypted"), bool):
             policy_display = "encrypted" if bool(payload.get("encrypted")) else "plain"
         else:
-            policy_display = "auto(initial)"
+            try:
+                protocol = registry.protocol_for_unit(unit_id)
+                auto = protocol.should_encrypt_auto(
+                    protocol_metadata=(
+                        dict(protocol_meta) if isinstance(protocol_meta, dict) else {}
+                    ),
+                    cfg=cfg,
+                )
+            except Exception:
+                auto = None
+            if auto is None:
+                auto = cfg.default_encrypt
+            policy_display = "initial-encrypted" if auto else "initial-plain"
 
         unit_label = unit_id
         if unit_id.startswith("gdrive/folder/") and isinstance(protocol_meta, dict):
