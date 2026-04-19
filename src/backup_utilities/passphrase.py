@@ -11,6 +11,23 @@ PromptFunc = Callable[[str], str | None]
 _lock = threading.Lock()
 _cached_passphrase: str | None = None
 _prompt_func: PromptFunc | None = None
+_env_passphrase: str | None = None
+_env_initialized = False
+
+
+def initialize_from_env() -> None:
+    """Capture BACKUP_PASSPHRASE into process memory and unset env var.
+
+    This is intentionally idempotent so callers can invoke it early in process startup.
+    """
+    global _env_initialized, _env_passphrase
+    with _lock:
+        if _env_initialized:
+            return
+        _env_initialized = True
+        value = os.environ.pop("BACKUP_PASSPHRASE", None)
+        if value:
+            _env_passphrase = value
 
 
 def set_prompt_func(func: PromptFunc | None) -> None:
@@ -60,7 +77,9 @@ def prompt_new_passphrase(prompt: str = "Backup passphrase: ") -> str:
 def get_passphrase(
     *, allow_prompt: bool = True, prompt: str = "Backup passphrase: "
 ) -> str:
-    env_value = os.environ.get("BACKUP_PASSPHRASE")
+    initialize_from_env()
+    with _lock:
+        env_value = _env_passphrase
     if env_value:
         return env_value
 

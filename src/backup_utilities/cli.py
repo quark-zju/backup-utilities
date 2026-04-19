@@ -9,6 +9,7 @@ from .config import load_config
 from .discovery import discover_units, format_discovered
 from .layout import init_root, load_index
 from .logging_utils import append_log
+from .passphrase import initialize_from_env
 from .protocols import default_registry
 from .recovery import decrypt_unit_payload
 from .runner import run_backup, verify_units
@@ -226,6 +227,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    initialize_from_env()
     parser = build_parser()
     args = parser.parse_args()
     root = _resolve_root_if_available(args)
