@@ -178,7 +178,7 @@ def get_passphrase_from_configured_keyring() -> str | None:
     try:
         value = get_passphrase_from_keyring(uuid)
     except Exception:
-        _logger.exception("keyring read failed for uuid=%s", uuid)
+        _logger.exception("keyring read failed for uuid=%s; falling back", uuid)
         return None
     if value:
         set_cached_passphrase(value)

@@ -110,3 +110,21 @@ def test_get_passphrase_from_keyring_does_not_create_missing_key(
     result = passphrase.get_passphrase_from_keyring(TEST_UUID)
     assert result is None
     assert not key_path.exists()
+
+
+def test_get_passphrase_falls_back_to_prompt_when_keyring_read_fails(
+    monkeypatch,
+) -> None:
+    def fail_read(_uuid: str) -> str | None:
+        raise ValueError("decrypt failed")
+
+    _reset_passphrase_state()
+    passphrase.configure_keyring_uuid(TEST_UUID)
+    passphrase.set_prompt_func(lambda _prompt: "typed-secret")
+    monkeypatch.setattr(passphrase, "get_passphrase_from_keyring", fail_read)
+
+    try:
+        result = passphrase.get_passphrase(allow_prompt=True)
+        assert result == "typed-secret"
+    finally:
+        _reset_passphrase_state()
