@@ -195,26 +195,47 @@ class BackupTextualApp(App[None]):
         table = self.query_one("#units_table", DataTable)
         table.clear(columns=False)
         for unit_id in self._state.visible_ids:
-            row = self._state.all_rows[unit_id]
-            marker = "x" if unit_id in self._state.selected_ids else ""
-            excluded = "x" if row.excluded else ""
-            runtime_status = self._backup_status.get(unit_id)
-            unit_label = row.unit_id
-            if runtime_status == "queued":
-                unit_label = f"{unit_label} (queued)"
-            elif runtime_status == "backing_up":
-                unit_label = f"{unit_label} (backing up)"
-            table.add_row(
-                marker,
-                excluded,
-                unit_label,
-                row.encrypt_policy,
-                _fmt_snapshot_date(row.last_snapshot_time),
-                _fmt_size(row.payload_size_bytes),
-                _fmt_ts(row.last_verify_time),
-            )
+            table.add_row(*self._row_values(unit_id))
         self._restore_cursor(preferred_unit_id)
         self._render_status()
+
+    def _row_values(self, unit_id: str) -> tuple[str, str, str, str, str, str, str]:
+        row = self._state.all_rows[unit_id]
+        marker = "x" if unit_id in self._state.selected_ids else ""
+        excluded = "x" if row.excluded else ""
+        runtime_status = self._backup_status.get(unit_id)
+        unit_label = row.unit_id
+        if runtime_status == "queued":
+            unit_label = f"{unit_label} (queued)"
+        elif runtime_status == "backing_up":
+            unit_label = f"{unit_label} (backing up)"
+        return (
+            marker,
+            excluded,
+            unit_label,
+            row.encrypt_policy,
+            _fmt_snapshot_date(row.last_snapshot_time),
+            _fmt_size(row.payload_size_bytes),
+            _fmt_ts(row.last_verify_time),
+        )
+
+    def _update_visible_row(self, unit_id: str) -> None:
+        if unit_id not in self._state.visible_ids:
+            return
+        row_index = self._state.visible_ids.index(unit_id)
+        values = self._row_values(unit_id)
+        table = self.query_one("#units_table", DataTable)
+        for col_index, value in enumerate(values):
+            table.update_cell_at(Coordinate(row_index, col_index), value)
+
+    def _refresh_one_unit_row(self, unit_id: str) -> None:
+        rows = collect_unit_rows(self._root)
+        latest = {row.unit_id: row for row in rows}
+        latest_row = latest.get(unit_id)
+        if latest_row is not None:
+            self._state.all_rows[unit_id] = latest_row
+        elif unit_id in self._state.all_rows:
+            del self._state.all_rows[unit_id]
 
     def _render_status(self, message: str | None = None) -> None:
         status = self.query_one("#status", Static)
@@ -283,6 +304,9 @@ class BackupTextualApp(App[None]):
     def _drain_backup_events(self) -> None:
         updated = False
         message: str | None = None
+        need_rerender = False
+        changed_unit_for_row_update: set[str] = set()
+        keep_id = self._state.focused_id or self._current_unit_id()
         while True:
             try:
                 phase, unit_id, ok, detail = self._backup_events.get_nowait()
@@ -292,9 +316,17 @@ class BackupTextualApp(App[None]):
             updated = True
             if phase == "start":
                 self._backup_status[unit_id] = "backing_up"
+                changed_unit_for_row_update.add(unit_id)
                 message = f"backing up: {unit_id}"
             elif phase == "done":
                 self._backup_status.pop(unit_id, None)
+                old_visible = list(self._state.visible_ids)
+                self._refresh_one_unit_row(unit_id)
+                self._state.apply_query(self._state.query_text)
+                if old_visible != self._state.visible_ids:
+                    need_rerender = True
+                else:
+                    changed_unit_for_row_update.add(unit_id)
                 if ok:
                     message = f"backup done: {unit_id}"
                 else:
@@ -304,7 +336,11 @@ class BackupTextualApp(App[None]):
                         message = f"backup failed: {unit_id}"
 
         if updated:
-            self.action_reload_units()
+            if need_rerender:
+                self._render_table(preferred_unit_id=keep_id)
+            else:
+                for unit_id in changed_unit_for_row_update:
+                    self._update_visible_row(unit_id)
             self._render_status(message)
 
     def _current_unit_id(self) -> str | None:
