@@ -26,7 +26,7 @@ def config_path(root: Path) -> Path:
 
 
 def default_config() -> Config:
-    return Config()
+    return Config(uuid=str(_uuid.uuid4()))
 
 
 def write_config(root: Path, cfg: Config) -> None:
@@ -85,6 +85,21 @@ def load_config(root: Path) -> Config:
     config_uuid = global_cfg.get("uuid", "")
     if not config_uuid:
         config_uuid = str(_uuid.uuid4())
+        cfg = Config(
+            uuid=config_uuid,
+            compression_level=int(global_cfg.get("compression_level", 10)),
+            max_workers=int(global_cfg.get("max_workers", 1)),
+            default_encrypt=bool(global_cfg.get("default_encrypt", False)),
+            github_include_forks=bool(protocol_cfg.get("include_forks", False)),
+            github_include_private=bool(protocol_cfg.get("include_private", True)),
+            github_default_private_encrypt=bool(
+                protocol_cfg.get("default_private_encrypt", True)
+            ),
+            unit_include=_ensure_str_list(units_cfg.get("include")),
+            unit_exclude=_ensure_str_list(units_cfg.get("exclude")),
+        )
+        write_config(root, cfg)
+        return cfg
 
     return Config(
         uuid=config_uuid,
