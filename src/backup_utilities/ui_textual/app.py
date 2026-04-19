@@ -390,7 +390,7 @@ class BackupTextualApp(App[None]):
             5: "payload_size_bytes",
             6: "last_verify_time",
         }
-        sort_column = column_map.get(event.cursor_column)
+        sort_column = column_map.get(event.column_index)
         if sort_column is None:
             return
         keep_id = self._state.focused_id or self._current_unit_id()
