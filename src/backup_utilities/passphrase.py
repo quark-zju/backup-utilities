@@ -10,7 +10,7 @@ from typing import Callable
 
 PromptFunc = Callable[[str], str | None]
 
-_CONFIG_DIR = Path.home() / ".config" / "backup-utilities"
+_KEY_DIR = Path.home() / ".config" / "backup-utilities" / "keyring-keys"
 _KEYRING_SERVICE = "backup-utilities"
 
 _lock = threading.Lock()
@@ -36,7 +36,7 @@ def initialize_from_env() -> None:
 
 
 def _get_key_path(uuid: str) -> Path:
-    return _CONFIG_DIR / f"{uuid}.key"
+    return _KEY_DIR / f"{uuid}.key"
 
 
 def _get_or_create_key(uuid: str) -> bytes:
@@ -44,7 +44,7 @@ def _get_or_create_key(uuid: str) -> bytes:
     if key_path.exists():
         return key_path.read_bytes()
     key = os.urandom(32)
-    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _KEY_DIR.mkdir(parents=True, exist_ok=True)
     key_path.write_bytes(key)
     return key
 
