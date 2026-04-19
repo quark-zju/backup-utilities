@@ -455,13 +455,24 @@ class BackupTextualApp(App[None]):
             self._log("passphrase cache cleared")
             return
 
-        entered = await self._prompt_new_passphrase_with_confirmation(
-            title="Passphrase",
-            first_prompt="Enter passphrase to cache in memory:",
+        entered = await self.push_screen_wait(
+            TextPromptScreen(
+                "Passphrase",
+                "Enter passphrase to cache in memory:",
+                "",
+                password=True,
+            )
         )
         if entered is None:
             self._render_status("passphrase unchanged")
             return
+        entered = entered.strip()
+        try:
+            entered = validate_new_passphrase(entered, require_confirmation=False)
+        except ValueError as exc:
+            self._render_status(str(exc))
+            return
+
         keyring_status = cache_confirmed_passphrase(entered)
         if keyring_status == "stored":
             self._render_status("passphrase cached and stored in keyring")
